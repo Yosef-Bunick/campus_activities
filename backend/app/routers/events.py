@@ -115,6 +115,7 @@ def list_events(
         types=types, start=start, end=end, happening_now=happening_now,
         building_ids=building_ids, room_ids=room_ids, search=search,
         recommended_for=(me.major or "") if recommended else None,
+        viewer_id=me.id,
     )  # fmt: skip
     return events_out(session, svc.list_events(session, f), me)
 

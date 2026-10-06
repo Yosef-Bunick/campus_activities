@@ -15,6 +15,7 @@ from app.models.user import User
 from app.routers.auth import user_public
 from app.routers.events import events_out
 from app.schemas.events import CancelScope
+from app.services.events import exclude_hidden
 
 router = APIRouter(tags=["favorites"])
 
@@ -109,7 +110,7 @@ def my_favorites(me: User = Depends(current_user), session: Session = Depends(ge
     people = list(session.exec(select(User).where(col(User.id).in_(fav_ids)))) if fav_ids else []
     from_people = list(
         session.exec(
-            select(Event)
+            exclude_hidden(select(Event), me.id)
             .where(*upcoming, col(Event.creator_id).in_(fav_ids))
             .order_by(Event.starts_at)
             .limit(200)

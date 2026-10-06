@@ -8,6 +8,8 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { FilterProvider } from '../contexts/FilterContext';
 import MapView from '../views/MapView';
 import FavoritesView from '../views/FavoritesView';
+import HiddenView from '../views/HiddenView';
+import AlertsView from '../views/AlertsView';
 
 const ROOM = { id: 1, name: '38', floor: 1, building: 'Test building', map_x: 0.68, map_y: 0.32 };
 const EVENT = {
@@ -78,5 +80,36 @@ describe('favorites', () => {
     expect(screen.getByText('Ana')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Unsave' }));
     await waitFor(() => expect(unsave).toHaveBeenCalled());
+  });
+});
+
+describe('hidden', () => {
+  it('lists hidden people and series with Unhide', async () => {
+    const calls = [];
+    api({
+      '/auth/me': { user: { id: 1 }, permissions: [], limits: {}, csrf_token: 't' },
+      '/hidden': { people: [{ id: 2, display_name: 'Ana' }], events: [{ ...EVENT, hidden: 'series' }] },
+      '/users/2/unhide': () => { calls.push('person'); return { ok: true }; },
+    });
+    renderPage(HiddenView);
+    expect(await screen.findByText('Ana')).toBeTruthy();
+    expect(screen.getByText('Study, group (all dates)')).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Unhide' })[0]);
+    await waitFor(() => expect(calls).toEqual(['person']));
+  });
+});
+
+describe('alerts', () => {
+  it('shows unread alerts and marks them read', async () => {
+    const read = vi.fn(() => ({ unread: 0 }));
+    api({
+      '/auth/me': { user: { id: 1 }, permissions: [], limits: {}, csrf_token: 't' },
+      '/alerts': { unread: 1, alerts: [{ id: 5, message: 'Jam was cancelled', read: false, created_at: '2026-10-06T15:00:00Z' }] },
+      '/alerts/read-all': read,
+    });
+    renderPage(AlertsView);
+    expect(await screen.findByText('Jam was cancelled')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all read' }));
+    await waitFor(() => expect(read).toHaveBeenCalled());
   });
 });

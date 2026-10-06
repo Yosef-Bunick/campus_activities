@@ -55,7 +55,7 @@ backend/         FastAPI: routers, services, models, permissions.py, tests
 render.yaml      deployment
 ```
 
-Milestones 0–2 are built (foundation, roles and sessions, events with Home, Calendar and the shared filter), plus the campus Map, Favorites (★ saved events, ♥ people), Add to calendar, and Home time chips with Recommended (main events + your major). The Microsoft login waits on the Entra app registration; until then use the local developer sign-in.
+Milestones 0–2 are built (foundation, roles and sessions, events with Home, Calendar and the shared filter), plus the campus Map, Favorites (★ saved events, ♥ people), Add to calendar, Home time chips with Recommended (main events + your major), Hidden, and Alerts. Next: Microsoft login and deploy. The Microsoft login waits on the Entra app registration; until then use the local developer sign-in.
 
 ## Getting started
 
@@ -85,6 +85,14 @@ npm run dev
 ```
 
 The top bar shows **API ok** when the frontend can reach the backend. Signed-out visitors only see the sign-in page; the **Sign in with Microsoft** button turns on once `MS_CLIENT_ID` / `MS_CLIENT_SECRET` / `OWNER_EMAIL` are in `.env` and the Microsoft login route lands. Roles and limits: edit `backend/app/core/permissions.py`. Majors (for Recommended): edit `backend/app/core/majors.py`.
+
+**Turning on Sign in with Microsoft** (one time, in the [Entra admin center](https://entra.microsoft.com) → App registrations → New registration):
+1. Name: the app's name. Supported account types: **Accounts in any organizational directory and personal Microsoft accounts** (so the owner's personal account works; everyone else is still limited to WCC by the app).
+2. Redirect URI: platform **Web**, `http://localhost:8000/auth/microsoft/callback` (add the production one later).
+3. Copy the **Application (client) ID** into `MS_CLIENT_ID` in `.env`.
+4. Certificates & secrets → New client secret → copy the **Value** into `MS_CLIENT_SECRET`.
+5. Set `OWNER_EMAIL` and a long random `SESSION_SECRET` (e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`), then restart the API. The button turns on by itself.
+6. Try a real `@my.sunywcc.edu` account. If it says **"Need admin approval"**, WCC IT has to grant consent once (architecture §8).
 
 **Testing without Microsoft:** set `DEV_LOGIN=1` in `.env` (localhost only). The sign-in page then shows a "Local testing only" form: type a school email, pick a role, sign in. No passwords.
 

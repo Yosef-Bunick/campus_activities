@@ -9,3 +9,7 @@ extend-ignore = [
     "S101", # `assert` in tests
     "E712", # SQLAlchemy filters require `== True/False`
 ]
+
+[lint.per-file-ignores]
+# Same test-scope idiom as unified: fixture credentials are not secrets.
+"tests/**" = ["S106"]

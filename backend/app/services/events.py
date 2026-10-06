@@ -202,9 +202,28 @@ def end_of_today() -> datetime:
     return datetime.combine(tomorrow, time(0), tzinfo=NY).astimezone(UTC)
 
 
+def exclude_hidden(q, viewer_id: int):
+    """Feed rule (§10): leave out events from people and events/series this
+    viewer has hidden."""
+    from app.models.social import HiddenEvent, UserHidden
+
+    people = select(UserHidden.hidden_user_id).where(UserHidden.user_id == viewer_id)
+    events = select(HiddenEvent.event_id).where(
+        HiddenEvent.user_id == viewer_id, HiddenEvent.event_id.is_not(None)
+    )
+    series = select(HiddenEvent.series_id).where(
+        HiddenEvent.user_id == viewer_id, HiddenEvent.series_id.is_not(None)
+    )
+    return q.where(
+        col(Event.creator_id).not_in(people),
+        col(Event.id).not_in(events),
+        or_(Event.series_id.is_(None), col(Event.series_id).not_in(series)),
+    )
+
+
 def list_events(session: Session, f: EventFilter) -> list[Event]:
-    """Feed rule (§10): active events, plus cancelled ones until they end.
-    Hidden people/events are filtered in Milestone 4."""
+    """Feed rule (§10): active events, plus cancelled ones until they end,
+    minus anything the viewer has hidden."""
     now = datetime.now(UTC)
     start = f.start or now
     end = f.end or end_of_today()
@@ -217,6 +236,8 @@ def list_events(session: Session, f: EventFilter) -> list[Event]:
         or_(Event.status == EventStatus.ACTIVE.value, Event.ends_at > now),
         col(Event.type).in_([t.value for t in (f.types or list(EventType))]),
     )
+    if f.viewer_id is not None:
+        q = exclude_hidden(q, f.viewer_id)
     if f.room_ids:
         q = q.where(col(Event.room_id).in_(f.room_ids))
     if f.recommended_for is not None:

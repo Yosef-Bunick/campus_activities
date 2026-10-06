@@ -40,3 +40,57 @@ jobs:
 
       - name: Tests
         run: python -m pytest -q --tb=short
+
+  # Production is Postgres (Neon); everything above runs on SQLite. Same idea
+  # as unified's migrations-postgres job: the migration must build, check,
+  # tear down and rebuild cleanly on real Postgres.
+  migrations-postgres:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: campus
+          POSTGRES_PASSWORD: campus
+          POSTGRES_DB: campus_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://campus:campus@localhost:5432/campus_ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Upgrade from empty
+        run: python -m alembic upgrade head
+
+      - name: Models match the migration
+        run: python -m alembic check
+
+      - name: Seed works on Postgres
+        run: python -m app.seed
+
+      - name: Downgrade to base, then upgrade again
+        run: |
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+
+      - name: API boots and /health sees the database
+        run: |
+          python -c "from fastapi.testclient import TestClient; from app.main import app; r = TestClient(app).get('/health'); print(r.json()); assert r.status_code == 200"

@@ -1,0 +1,41 @@
+# Render: the API only (architecture §2). The database is Neon (ADR-015), the
+# frontend is Vercel. Based on unified's render.yaml, trimmed.
+services:
+  - type: web
+    name: campus-events-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # --timeout-keep-alive 75: never close idle connections before Render's
+    # proxy does (unified FS-37: intermittent 502s otherwise).
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 75
+    healthCheckPath: /health
+    # free sleeps after 15 min idle (first request then takes ~30-60 s);
+    # starter stays awake. Pick when deploying.
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: DATABASE_URL          # Neon connection string, ...?sslmode=require
+        sync: false
+      - key: MS_CLIENT_ID
+        sync: false
+      - key: MS_CLIENT_SECRET
+        sync: false
+      - key: MS_REDIRECT_URI       # https://<api host>/auth/microsoft/callback
+        sync: false
+      - key: ALLOWED_TENANT_IDS
+        value: 4981a704-f6a3-4ac0-89c2-a3812354a3ff
+      - key: EMAIL_DOMAIN_REQUIREMENT
+        value: sunywcc.edu
+      - key: OWNER_EMAIL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: FRONTEND_ORIGIN       # https://<frontend host>
+        sync: false
+      - key: INACTIVITY_DELETE_DAYS
+        value: "150"
+      - key: SENTRY_DSN
+        sync: false
+      # DEV_LOGIN is deliberately absent: it's localhost-only (ADR-023).

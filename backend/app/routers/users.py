@@ -7,7 +7,7 @@ from sqlmodel import Session
 from app.core.auth import current_user, require
 from app.core.database import get_session
 from app.core.permissions import Role, can, outranks
-from app.models.social import UserFavorite
+from app.models.social import UserFavorite, UserHidden
 from app.models.user import BannedAccount, User
 from app.routers.auth import user_public
 from app.services import events as event_svc
@@ -42,6 +42,7 @@ def person(
         **user_public(target),
         "is_banned": target.is_banned,
         "is_favorite": session.get(UserFavorite, (me.id, target.id)) is not None,
+        "is_hidden": session.get(UserHidden, (me.id, target.id)) is not None,
         "actions": {
             "favorite": me.id != target.id,
             "hide": me.id != target.id,

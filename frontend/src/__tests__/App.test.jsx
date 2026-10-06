@@ -82,7 +82,7 @@ describe('Sign out', () => {
     const loc = renderAt('/home', ME);
     fireEvent.click(await screen.findByRole('button', { name: 'Profile menu' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
-    expect(await screen.findByRole('button', { name: 'Sign in with Microsoft' })).toBeTruthy();
+    expect(await screen.findByText('Sign in with Microsoft')).toBeTruthy();
     expect(loc.history.at(-1)).toBe('/');
     const logout = fetch.mock.calls.find(([url]) => url.endsWith('/auth/logout'));
     expect(logout[1].headers['X-CSRF-Token']).toBe('tok');
@@ -92,7 +92,7 @@ describe('Sign out', () => {
 describe('App shell (signed out)', () => {
   it('sends signed-out users to the sign-in page, with no tab bar', async () => {
     const loc = renderAt('/map', null);
-    expect(await screen.findByRole('button', { name: 'Sign in with Microsoft' })).toBeTruthy();
+    expect(await screen.findByText('Sign in with Microsoft')).toBeTruthy();
     await waitFor(() => expect(loc.history.at(-1)).toBe('/'));
     expect(screen.queryByRole('button', { name: 'Calendar' })).toBeNull();
   });

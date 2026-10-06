@@ -37,11 +37,18 @@ export default function PersonSheet({ userId, open, onClose }) {
     mutationFn: () => apiPost(`/users/${userId}/${person.is_favorite ? 'unfavorite' : 'favorite'}`),
     onSuccess: () => { refresh(); qc.invalidateQueries({ queryKey: ['favorites'] }); },
   });
+  const hide = useMutation({
+    mutationFn: () => apiPost(`/users/${userId}/${person.is_hidden ? 'unhide' : 'hide'}`),
+    onSuccess: () => {
+      refresh();
+      ['events', 'favorites', 'hidden'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    },
+  });
   const changeRole = useMutation({
     mutationFn: (newRole) => apiPut(`/users/${userId}/role`, { role: newRole }),
     onSuccess: refresh,
   });
-  const actionError = ban.error || changeRole.error || fav.error;
+  const actionError = ban.error || changeRole.error || fav.error || hide.error;
 
   return (
     <Drawer anchor="bottom" open={open} onClose={onClose} PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16 } }}>
@@ -61,8 +68,12 @@ export default function PersonSheet({ userId, open, onClose }) {
                   {person.is_favorite ? 'Favorited' : 'Favorite'}
                 </Button>
               )}
-              {/* Hiding is stored in Milestone 4. */}
-              {person.actions.hide && <Button variant="outlined" disabled fullWidth>Hide</Button>}
+              {person.actions.hide && (
+                <Button variant={person.is_hidden ? 'contained' : 'outlined'} color="inherit" fullWidth
+                  disabled={hide.isPending} onClick={() => hide.mutate()}>
+                  {person.is_hidden ? 'Hidden' : 'Hide'}
+                </Button>
+              )}
             </Box>
             {person.actions.change_role && (
               <Box sx={{ display: 'flex', gap: 1 }}>

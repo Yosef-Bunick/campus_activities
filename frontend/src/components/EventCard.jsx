@@ -40,6 +40,15 @@ export default function EventCard({ event, showDate = false }) {
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['events'] });
     qc.invalidateQueries({ queryKey: ['favorites'] });
+    qc.invalidateQueries({ queryKey: ['hidden'] });
+  };
+  const hide = useMutation({
+    mutationFn: (scope) => apiPost(`/events/${event.id}/hide`, { scope }),
+    onSuccess: refresh,
+  });
+  const onHide = (e) => {
+    if (event.series_id) setMenu({ anchor: e.currentTarget, kind: 'hide' });
+    else hide.mutate('this');
   };
   const save = useMutation({
     mutationFn: (scope) => (scope ? apiPost(`/events/${event.id}/save`, { scope }) : apiPost(`/events/${event.id}/unsave`)),
@@ -103,6 +112,7 @@ export default function EventCard({ event, showDate = false }) {
               </Button>
             )}
             {canEdit && <Button size="small" variant="outlined" onClick={() => setDialog('edit')}>Edit</Button>}
+            {!mine && <Button size="small" variant="outlined" color="inherit" onClick={onHide}>Hide</Button>}
             {canCancel && (
               <Button size="small" color="error" variant="outlined" onClick={() => setDialog('cancel')}>
                 {event.series_id ? 'Cancel…' : 'Cancel event'}
@@ -115,6 +125,10 @@ export default function EventCard({ event, showDate = false }) {
         {menu?.kind === 'save' && [
           <MenuItem key="this" onClick={() => { close(); save.mutate('this'); }}>Save this date</MenuItem>,
           <MenuItem key="series" onClick={() => { close(); save.mutate('series'); }}>Save all dates</MenuItem>,
+        ]}
+        {menu?.kind === 'hide' && [
+          <MenuItem key="this" onClick={() => { close(); hide.mutate('this'); }}>Hide this date</MenuItem>,
+          <MenuItem key="series" onClick={() => { close(); hide.mutate('series'); }}>Hide all dates</MenuItem>,
         ]}
         {menu?.kind === 'calendar' && [
           <MenuItem key="ics" onClick={() => { close(); downloadIcs(event); }}>Apple / Outlook / other (.ics)</MenuItem>,

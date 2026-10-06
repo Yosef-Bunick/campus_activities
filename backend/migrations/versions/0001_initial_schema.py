@@ -2,7 +2,7 @@
 
 Revision ID: 0001
 Revises: 
-Create Date: 2026-10-05 22:50:26.264533
+Create Date: 2026-10-05 22:57:28.138679
 """
 
 from collections.abc import Sequence
@@ -95,6 +95,14 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('user_id', 'favorite_user_id')
     )
+    op.create_table('userhidden',
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('hidden_user_id', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['hidden_user_id'], ['user.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('user_id', 'hidden_user_id')
+    )
     op.create_table('room',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('floor_id', sa.Integer(), nullable=True),
@@ -154,6 +162,22 @@ def upgrade() -> None:
     with op.batch_alter_table('alert', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_alert_user_id'), ['user_id'], unique=False)
 
+    op.create_table('hiddenevent',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('event_id', sa.Integer(), nullable=True),
+    sa.Column('series_id', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['event_id'], ['event.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['series_id'], ['eventseries.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'event_id', name='uq_hidden_event'),
+    sa.UniqueConstraint('user_id', 'series_id', name='uq_hidden_series')
+    )
+    with op.batch_alter_table('hiddenevent', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_hiddenevent_user_id'), ['user_id'], unique=False)
+
     op.create_table('savedevent',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -179,6 +203,10 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_savedevent_user_id'))
 
     op.drop_table('savedevent')
+    with op.batch_alter_table('hiddenevent', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_hiddenevent_user_id'))
+
+    op.drop_table('hiddenevent')
     with op.batch_alter_table('alert', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_alert_user_id'))
 
@@ -195,6 +223,7 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_room_floor_id'))
 
     op.drop_table('room')
+    op.drop_table('userhidden')
     op.drop_table('userfavorite')
     with op.batch_alter_table('floor', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_floor_building_id'))

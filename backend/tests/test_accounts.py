@@ -2,6 +2,7 @@ import pytest
 from tests.conftest import WCC
 
 from app.services.accounts import (
+    MSA_CONSUMER_TENANT,
     MicrosoftIdentity,
     SignInRejected,
     account_hash,
@@ -49,8 +50,14 @@ def test_wcc_tenant_with_wrong_domain_is_rejected(db):
 
 
 def test_owner_email_is_exempt_and_becomes_owner(db):
-    user = sign_in(db, MicrosoftIdentity("personal-msa-tenant", "o9", "Owner@Gmail.com"))
+    user = sign_in(db, MicrosoftIdentity(MSA_CONSUMER_TENANT, "o9", "Owner@Gmail.com"))
     assert user.role == "owner"
+
+
+def test_owner_email_from_some_other_tenant_is_rejected(db):
+    # Anyone can make an Entra tenant and put any email on an account (ADR-029).
+    with pytest.raises(SignInRejected):
+        sign_in(db, MicrosoftIdentity("attacker-tenant", "o9", "owner@gmail.com"))
 
 
 def test_banned_account_cannot_sign_in(db):

@@ -33,7 +33,11 @@ def _load_dotenv(path: Path) -> None:
 
 def _resolve_sqlite(url: str) -> str:
     """Anchor a relative SQLite path to backend/, so uvicorn, alembic and
-    pytest all hit the same file no matter which directory they run from."""
+    pytest all hit the same file no matter which directory they run from.
+    Also accepts the `postgres://` spelling some hosts (Neon, Heroku) hand out,
+    which SQLAlchemy 2 rejects."""
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
     prefix = "sqlite:///"
     if url.startswith(prefix) and not url.startswith(prefix + "/"):
         rel = url[len(prefix) :]

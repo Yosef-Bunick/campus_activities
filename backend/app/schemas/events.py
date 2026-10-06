@@ -94,4 +94,6 @@ class EventFilter(BaseModel):
     favorites_only: bool = False  # Milestone 4
     # Recommended (ADR-028): main events, or events tagged with this major.
     recommended_for: str | None = None
+    # Feed rule: drop events from people / events / series this user has hidden.
+    viewer_id: int | None = None
     search: str = ""

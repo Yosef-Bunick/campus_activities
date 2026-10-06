@@ -31,7 +31,8 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 ## Milestone 1: Sign-in and roles 🟨
 - [ ] **First step:** register the app in Microsoft Entra and test with a real `@my.sunywcc.edu` account. If you see "Need admin approval", contact WCC IT. If IT blocks it, switch to Plan B (architecture §8). *Waiting on the Entra keys; everything below that doesn't need Microsoft was built first (2026-10-06)*
 - [x] Local developer sign-in for testing without Microsoft (`DEV_LOGIN=1`, localhost only; ADR-023)
-- [ ] "Sign in with Microsoft", a single button (OIDC via `authlib`, unified's Google sign-in pattern): `/auth/microsoft/login` + `/callback` that validate the ID token and call `services/accounts.sign_in()`; enable the button
+- [x] "Sign in with Microsoft", a single button: `/auth/microsoft/login` + `/callback` with state, nonce and PKCE; the ID token's signature, audience, issuer, expiry and nonce are checked (joserfc, shipped with authlib), then `services/accounts.sign_in()`. Tested end to end against a fake Microsoft. The button turns on by itself once the keys are in `.env` (ADR-029)
+- [x] Owner exemption only trusted from the WCC tenant or Microsoft's personal-account tenant, so another tenant can't claim `OWNER_EMAIL` (ADR-029)
 - [x] Gate: WCC tenant **and** `sunywcc.edu` / `*.sunywcc.edu`; `OWNER_EMAIL` is exempt and becomes owner (`services/accounts.py`, tested with fake identities)
 - [x] Revocable sessions (httpOnly cookie + CSRF), copied from unified (ADR-018, ADR-019)
 - [x] Roles + **`backend/app/core/permissions.py`**: permissions **and** scheduling limits in one file
@@ -75,14 +76,15 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 
 **Done when:** you can open the map on your phone and see which rooms have something going on right now.
 
-## Milestone 4: Favorites, Hidden, Alerts ⬜
+## Milestone 4: Favorites, Hidden, Alerts 🟨
 - [x] **`/favorites`**: ★ saved events (one date or a whole series) and events from people you favorite (♥ in the person sheet). Pulled forward at your request (ADR-025)
-- [ ] **`/hidden`**: people and events/series you've hidden, with Unhide
+- [x] **`/hidden`**: people and events/series you've hidden, with Unhide. Hide from an event card (this date / all dates) or the person sheet; hidden things drop out of every feed
 - [x] Person sheet **Favorite** button (`UserFavorite`)
-- [ ] Person sheet **Hide** button (`UserHidden`)
-- [ ] **`/alerts`**: "your event was cancelled" notices, with a read/unread state
+- [x] Person sheet **Hide** button (`UserHidden`)
+- [x] **`/alerts`**: "your event was cancelled" notices, with a read/unread state, Mark all read, and an unread badge on the Alerts tab
 - [ ] Deploy (Vercel frontend + Render API + **Neon** database), turn on Sentry, and **pilot with a small group**
-  - [ ] `render.yaml` (API only) + Postgres driver (`psycopg2-binary`, as unified) in `requirements.txt`; run `alembic upgrade head` on start
+  - [x] `render.yaml` (API only) + Postgres driver (`psycopg2-binary`, as unified) in `requirements.txt`; run `alembic upgrade head` on start
+  - [x] CI builds, checks, tears down and rebuilds the migration on real Postgres 16, seeds it, and boots the API against it
   - [ ] Set `VITE_API_BASE` in Vercel; add the Vercel URL to `FRONTEND_ORIGIN`
   - [ ] Make the session cookie first-party: iPhone Safari blocks cookies from a different site, so `*.vercel.app` → `*.onrender.com` won't keep anyone signed in. Needs the domain decision (`app.` + `api.` on one domain, or a Vercel `/api` rewrite)
   - [ ] Real app icons and name in the PWA manifest

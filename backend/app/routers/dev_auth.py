@@ -20,7 +20,9 @@ WCC_TENANT = "4981a704-f6a3-4ac0-89c2-a3812354a3ff"
 @router.get("/config")
 def auth_config() -> dict:
     """Which sign-in options the sign-in page should show."""
-    return {"microsoft": bool(settings.ms_client_id), "dev_login": settings.dev_login}
+    from app.core import microsoft_auth
+
+    return {"microsoft": microsoft_auth.configured(), "dev_login": settings.dev_login}
 
 
 class DevLogin(BaseModel):
