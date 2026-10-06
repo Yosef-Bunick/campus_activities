@@ -8,6 +8,8 @@ alembic==1.18.5
 # does the code exchange (and FastAPI's TestClient uses it too).
 authlib==1.7.2
 httpx==0.28.1
+# Error reports; only active when SENTRY_DSN is set (same pin as unified)
+sentry-sdk==2.66.1
 # Postgres driver for Neon in production (same as unified)
 psycopg2-binary==2.9.12
 # Tests

@@ -88,7 +88,8 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
   - [ ] Set `VITE_API_BASE` in Vercel; add the Vercel URL to `FRONTEND_ORIGIN`
   - [ ] Make the session cookie first-party: iPhone Safari blocks cookies from a different site, so `*.vercel.app` → `*.onrender.com` won't keep anyone signed in. Needs the domain decision (`app.` + `api.` on one domain, or a Vercel `/api` rewrite)
   - [ ] Real app icons and name in the PWA manifest
-  - [ ] Playwright smoke test at phone size (`frontend/e2e/`)
+  - [x] Playwright smoke test at phone size (`frontend/e2e/`): sign in → post → Calendar → save → Favorites → Map, no sideways overflow. Runs in CI (`e2e.yml`); locally `npm run e2e` (set `PW_CHANNEL=chrome` to reuse installed Chrome)
+  - [x] Sentry wired, off until `SENTRY_DSN` / `VITE_SENTRY_DSN` are set (ADR-030)
 
 **Done when:** the pilot group uses it on their phones for a week.
 

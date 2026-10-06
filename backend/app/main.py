@@ -15,6 +15,12 @@ from app.routers import (
     users,
 )
 
+if settings.sentry_dsn:
+    import sentry_sdk
+
+    # Off unless SENTRY_DSN is set. No personal data: no IPs, cookies or bodies.
+    sentry_sdk.init(dsn=settings.sentry_dsn, traces_sample_rate=0.1, send_default_pii=False)
+
 app = FastAPI(title="Campus Events API", version="0.1.0")
 
 # Added before CORS so CORS is the outer layer: CSRF 403s still carry CORS headers.

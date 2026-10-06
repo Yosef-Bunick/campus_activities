@@ -34,3 +34,7 @@ Thumbs.db
 # Local notes / large source images (not part of the app)
 New Text Document.txt
 WCC_MAP.png
+
+# Playwright
+test-results/
+playwright-report/

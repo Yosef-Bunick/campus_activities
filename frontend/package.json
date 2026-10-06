@@ -9,19 +9,22 @@
     "preview": "vite preview",
     "lint": "oxlint src",
     "test": "vitest run",
-    "size": "node scripts/check-size.mjs"
+    "size": "node scripts/check-size.mjs",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@emotion/react": "^11.13.0",
     "@emotion/styled": "^11.13.0",
     "@mui/icons-material": "^5.16.0",
     "@mui/material": "^5.16.0",
+    "@sentry/react": "^9.47.2",
     "@tanstack/react-query": "^5.101.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "wouter": "^3.13.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^6.0.4",
     "jsdom": "^29.1.1",

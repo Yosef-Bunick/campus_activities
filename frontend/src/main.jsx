@@ -22,6 +22,18 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>
 );
 
+// Error reports (ADR-030): only when VITE_SENTRY_DSN is set, and loaded with a
+// dynamic import so Sentry never counts against the first-load budget.
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+if (sentryDsn) {
+  import('@sentry/react').then((Sentry) => Sentry.init({
+    dsn: sentryDsn,
+    tracesSampleRate: 0.1,
+    sendDefaultPii: false,
+    environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || 'production',
+  }));
+}
+
 // Stale chunk after a deploy (old index.html asks for an old hash): reload
 // instead of showing a blank page. Copied from unified's main.jsx (F3).
 window.addEventListener('vite:preloadError', () => {
