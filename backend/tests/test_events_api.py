@@ -87,17 +87,19 @@ def test_student_cannot_double_book_self(db, rooms):
     assert sga.post("/events", json=body(rooms["26"])).status_code == 201
 
 
-def test_room_limit_blocks_third_overlap(db, rooms):
+def test_third_overlap_in_a_room_waits_for_approval(db, rooms):
+    # Phase 2 (ADR-014): the 3rd overlapping event isn't blocked any more; it's
+    # saved as pending_approval. Full flow in test_phase2.py.
     for _ in range(2):
         assert client_for(db, make_user(db)).post("/events", json=body(rooms["108"])).status_code == 201
     r = client_for(db, make_user(db)).post("/events", json=body(rooms["108"]))
-    assert r.status_code == 409 and r.json()["conflicts"][0]["reason"] == "Room is full at that time"
+    assert r.status_code == 201 and r.json()[0]["status"] == "pending_approval"
 
 
 def test_conflicting_dates_can_be_skipped(db, rooms):
-    for _ in range(2):  # fill room 108 three days from now
-        client_for(db, make_user(db)).post("/events", json=body(rooms["108"], days=3))
-    c = client_for(db, make_user(db))
+    me = make_user(db)
+    c = client_for(db, me)
+    c.post("/events", json=body(rooms["26"], days=3))  # I'm already busy three days from now
     until = (datetime.now(NY).date() + timedelta(days=5)).isoformat()
     req = body(rooms["108"], days=1, repeat={"freq": "daily", "until": until})
     r = c.post("/events", json=req)

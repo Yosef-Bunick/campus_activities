@@ -19,6 +19,8 @@ class EventType(str, Enum):
 class EventStatus(str, Enum):
     ACTIVE = "active"
     CANCELLED = "cancelled"
+    PENDING = "pending_approval"  # 3rd overlap in a room, waiting for SGA/owner (ADR-014)
+    REJECTED = "rejected"
 
 
 class Freq(str, Enum):
@@ -63,8 +65,11 @@ class Alert(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True, ondelete="CASCADE")
-    kind: str = Field(max_length=30)  # event_cancelled [P1]
+    # event_cancelled, approval_needed, event_approved, event_rejected, abuse_flag
+    kind: str = Field(max_length=30)
     event_id: int | None = Field(default=None, foreign_key="event.id", ondelete="SET NULL")
     message: str = Field(max_length=500)
+    # The person an abuse flag is about (opens their person sheet).
+    subject_user_id: int | None = Field(default=None, foreign_key="user.id", ondelete="SET NULL")
     read_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)

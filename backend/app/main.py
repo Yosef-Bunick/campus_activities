@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,6 +15,7 @@ from app.routers import (
     health,
     hidden,
     microsoft_auth,
+    moderation,
     users,
 )
 
@@ -21,7 +25,21 @@ if settings.sentry_dsn:
     # Off unless SENTRY_DSN is set. No personal data: no IPs, cookies or bodies.
     sentry_sdk.init(dsn=settings.sentry_dsn, traces_sample_rate=0.1, send_default_pii=False)
 
-app = FastAPI(title="Campus Events API", version="0.1.0")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    task = None
+    if settings.worker_enabled:
+        from app.worker import daily_loop
+
+        task = asyncio.create_task(daily_loop())
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(title="Campus Events API", version="0.1.0", lifespan=lifespan)
 
 # Added before CORS so CORS is the outer layer: CSRF 403s still carry CORS headers.
 app.add_middleware(CSRFMiddleware)
@@ -45,3 +63,4 @@ app.include_router(favorites.router)
 app.include_router(hidden.router)
 app.include_router(alerts.router)
 app.include_router(microsoft_auth.router)
+app.include_router(moderation.router)

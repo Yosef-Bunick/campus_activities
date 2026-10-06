@@ -11,6 +11,7 @@ from app.models.social import UserFavorite, UserHidden
 from app.models.user import BannedAccount, User
 from app.routers.auth import user_public
 from app.services import events as event_svc
+from app.services import moderation as M
 from app.services import sessions
 from app.services.accounts import account_hash
 
@@ -68,6 +69,9 @@ def ban(
     session.commit()
     sessions.revoke_all(session, target.id)
     cancelled = event_svc.cancel_upcoming_for_ban(session, me, target.id)
+    M.log(session, me, "ban", f"Banned {M.name(target)} ({cancelled} upcoming events cancelled)",
+          target_user=target)  # fmt: skip
+    session.commit()
     return {"ok": True, "events_cancelled": cancelled}
 
 
@@ -82,6 +86,7 @@ def unban(
     row = session.get(BannedAccount, account_hash(target.ms_tenant_id, target.ms_object_id))
     if row is not None:
         session.delete(row)
+    M.log(session, me, "unban", f"Unbanned {M.name(target)}", target_user=target)
     session.commit()
     return {"ok": True}
 
@@ -101,6 +106,8 @@ def change_role(
     _check_hierarchy(me, target)
     if not outranks(Role(me.role), body.role):
         raise HTTPException(403, "You can only assign roles below your own")
+    M.log(session, me, "change_role", f"{M.name(target)}: {target.role} → {body.role.value}",
+          target_user=target)  # fmt: skip
     target.role = body.role.value
     session.add(target)
     session.commit()

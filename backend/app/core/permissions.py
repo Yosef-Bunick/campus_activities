@@ -47,6 +47,11 @@ CAN_DOUBLE_BOOK_SELF = {Role.OWNER, Role.MANAGER, Role.STUDENT_GOV}  # others: 1
 ROOM_MAX_OVERLAPPING = 2      # default; a Room can override it (e.g. the cafeteria)
 MAX_EVENTS_CREATED_PER_DAY = {Role.STUDENT: 10, Role.SECURITY: 10}   # anti-spam; others unlimited
 
+# ── Automatic abuse flags (Phase 2): alert managers + owner, never auto-ban ──
+FLAG_REPORTS_PER_EVENT = 3        # this many reports on one event
+FLAG_CAP_HITS_PER_WEEK = 3        # hit the daily creation cap this many times in 7 days
+FLAG_ROOM_FULL_PER_WEEK = 5       # sent this many events to room approval in 7 days
+
 
 def can(role: Role, perm: str) -> bool:
     """Unknown permission names are denied, never allowed."""

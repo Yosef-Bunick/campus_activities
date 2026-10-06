@@ -14,6 +14,7 @@ from app.models.user import User
 from app.services.recurrence import ny_date
 
 MAX_LENGTH = timedelta(hours=12)
+ROOM_FULL = "Room is full at that time"
 
 CREATE_PERM = {
     EventType.MAIN: "event.create.main",
@@ -107,5 +108,5 @@ def occurrence_problem(
         )
     ).one()
     if in_room >= limit:
-        return "Room is full at that time"
+        return ROOM_FULL
     return None

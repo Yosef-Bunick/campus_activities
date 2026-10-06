@@ -91,6 +91,15 @@ jobs:
           python -m alembic downgrade base
           python -m alembic upgrade head
 
+      - name: Event, approval and purge tests on Postgres
+        # Postgres enforces foreign keys strictly (SQLite doesn't by default),
+        # so the account purge and moderation paths are re-run here.
+        env:
+          TEST_DATABASE_URL: postgresql://campus:campus@localhost:5432/campus_tests
+        run: |
+          PGPASSWORD=campus psql -h localhost -U campus -d campus_ci -c "CREATE DATABASE campus_tests"
+          python -m pytest -q --tb=short tests/test_events_api.py tests/test_phase2.py tests/test_hidden_alerts.py tests/test_favorites.py
+
       - name: API boots and /health sees the database
         run: |
           python -c "from fastapi.testclient import TestClient; from app.main import app; r = TestClient(app).get('/health'); print(r.json()); assert r.status_code == 200"

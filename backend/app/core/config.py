@@ -72,6 +72,8 @@ class Settings:
     inactivity_delete_days: int = int(os.getenv("INACTIVITY_DELETE_DAYS", "150"))
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
     sentry_dsn: str = os.getenv("SENTRY_DSN", "")
+    # Daily jobs (150-day purge) inside the API process; tests turn it off.
+    worker_enabled: bool = os.getenv("WORKER_ENABLED", "1") == "1"
     # Local-only "sign in as" for testing before/without Microsoft (ADR-023).
     dev_login_flag: bool = os.getenv("DEV_LOGIN", "") == "1"
 

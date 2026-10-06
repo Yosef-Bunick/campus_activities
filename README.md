@@ -55,7 +55,7 @@ backend/         FastAPI: routers, services, models, permissions.py, tests
 render.yaml      deployment
 ```
 
-Milestones 0–2 are built (foundation, roles and sessions, events with Home, Calendar and the shared filter), plus the campus Map, Favorites (★ saved events, ♥ people), Add to calendar, Home time chips with Recommended (main events + your major), Hidden, and Alerts. Next: Microsoft login and deploy. The Microsoft login waits on the Entra app registration; until then use the local developer sign-in.
+Milestones 0–2 are built (foundation, roles and sessions, events with Home, Calendar and the shared filter), plus the campus Map, Favorites (★ saved events, ♥ people), Add to calendar, Home time chips with Recommended (main events + your major), Hidden, Alerts, and all of Phase 2 (room approvals, room limits, reports and flags, moderation log, 150-day purge + Delete my account, terms note, extend series, offline). Next: real Microsoft sign-in and deploy. The Microsoft login waits on the Entra app registration; until then use the local developer sign-in.
 
 ## Getting started
 

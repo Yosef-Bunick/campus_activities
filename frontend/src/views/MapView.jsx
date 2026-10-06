@@ -14,12 +14,14 @@ import RemoveIcon from '@mui/icons-material/esm/Remove';
 import FilterIcon from '@mui/icons-material/esm/FilterList';
 import EventList from '../components/EventList';
 import { TAB_BAR_HEIGHT } from '../components/BottomTabs';
+import { useAuth } from '../contexts/AuthContext';
 import { toApiParams, useFilter } from '../contexts/FilterContext';
 import { useEvents, useRooms } from '../hooks/useEvents';
 import { roomLabel } from '../lib/labels';
 import { addDays, nyDateKey, nyToDate } from '../lib/time';
 
 const FilterSheet = lazy(() => import('../components/FilterSheet'));
+const RoomLimit = lazy(() => import('../components/RoomLimit'));
 const MAP_SRC = '/maps/campus.webp'; // WCC_MAP2.png; pins are 0..1 of its width/height
 const MAP_RATIO = 892 / 590;
 const MIN_ZOOM = 1;
@@ -30,6 +32,7 @@ const clamp = (z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 // Tap a room to see its events. Floor-plan SVGs come later, per floor.
 export default function MapView() {
   const { filter, active } = useFilter();
+  const { can } = useAuth();
   const [when, setWhen] = useState('today'); // 'now' | 'today'
   const [zoom, setZoom] = useState(1.6);
   const [room, setRoom] = useState(null);
@@ -121,6 +124,9 @@ export default function MapView() {
               {room.floor != null && `Floor ${room.floor} · `}{when === 'now' ? 'Happening now' : 'Rest of today'}
             </Typography>
             <EventList query={roomEvents} grouped={false} empty="Nothing here right now." />
+            {can('map.manage') && (
+              <Suspense fallback={null}><RoomLimit room={room} onSaved={setRoom} /></Suspense>
+            )}
             <Button onClick={() => setRoom(null)}>Close</Button>
           </Box>
         )}

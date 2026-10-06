@@ -10,6 +10,8 @@ import MapView from '../views/MapView';
 import FavoritesView from '../views/FavoritesView';
 import HiddenView from '../views/HiddenView';
 import AlertsView from '../views/AlertsView';
+import App from '../App';
+import EventCard from '../components/EventCard';
 
 const ROOM = { id: 1, name: '38', floor: 1, building: 'Test building', map_x: 0.68, map_y: 0.32 };
 const EVENT = {
@@ -111,5 +113,41 @@ describe('alerts', () => {
     expect(await screen.findByText('Jam was cancelled')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Mark all read' }));
     await waitFor(() => expect(read).toHaveBeenCalled());
+  });
+});
+
+describe('phase 2', () => {
+  const SGA = { user: { id: 1 }, permissions: ['event.approve_overlap'], limits: {}, csrf_token: 't' };
+
+  it('lets SGA approve a pending room request from Alerts', async () => {
+    const approve = vi.fn(() => ({ updated: 1 }));
+    api({
+      '/auth/me': SGA,
+      '/alerts': { unread: 1, alerts: [{ id: 7, kind: 'approval_needed', event_id: 3, event_status: 'pending_approval',
+        message: 'Ana wants “Jam” in Room 108', read: false, created_at: '2026-10-06T15:00:00Z' }] },
+      '/events/3/approve': approve,
+    });
+    renderPage(AlertsView);
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(approve).toHaveBeenCalled());
+  });
+
+  it('shows a pending event as waiting for approval', async () => {
+    api({ '/auth/me': SGA });
+    renderPage(() => <EventCard event={{ ...EVENT, status: 'pending_approval' }} />);
+    expect(await screen.findByText(/Waiting for approval/)).toBeTruthy();
+  });
+
+  it('asks new users to agree to the terms first', async () => {
+    const accept = vi.fn(() => ({ ok: true }));
+    api({
+      '/auth/me': { ...SGA, terms: { version: 1, items: ['Be kind.'] } },
+      '/auth/me/accept-terms': accept,
+      '/events': [], '/rooms': [], '/alerts/unread': { unread: 0 },
+    });
+    renderPage(App);
+    expect(await screen.findByText('• Be kind.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'I agree' }));
+    await waitFor(() => expect(accept).toHaveBeenCalled());
   });
 });

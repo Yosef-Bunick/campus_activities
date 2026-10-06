@@ -97,14 +97,14 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 
 # Phase 2: Rules & polish (after the pilot)
 
-- [ ] **Room approval flow:** a 3rd overlapping event becomes `pending_approval`, an alert goes to **SGA and the owner** in `/alerts`, and they approve or reject it
-- [ ] Per-room overlap limit (cafeteria, quad, and similar spaces)
-- [ ] **Abuse handling:** Report button; auto-flags to managers (repeated cap hits, repeated room blocks, multiple reports) → a human decides whether to ban
-- [ ] Moderation log (owner, manager, security)
-- [ ] **150-day inactivity purge** (daily job; owner exempt; bans persist) + **Delete my account**
-- [ ] Short terms of use / privacy note at first sign-in
-- [ ] "Extend series" button when a recurring event nears its 3-month or 1-year end
-- [ ] Offline: show the last-loaded events when there's no signal
+- [x] **Room approval flow:** a 3rd overlapping event becomes `pending_approval` (only its creator sees it), one alert per request goes to **SGA and the owner** in `/alerts` with Approve / Reject (a series is decided together), and the creator is told either way
+- [x] Per-room overlap limit (cafeteria, quad, and similar spaces): managers/owner set it in the Map room sheet
+- [x] **Abuse handling:** Report button on events; auto-flags to managers + owner in `/alerts` (3 reports on an event, 3 daily-cap hits or 5 room-approval requests in a week; thresholds in `permissions.py`) with "View person" → a human decides whether to ban
+- [x] Moderation log (owner, manager, security) in the profile menu: bans, role changes, cancels of others' events, approvals, room limits, reports, flags
+- [x] **150-day inactivity purge** (daily, inside the API process; owner exempt; bans and log text persist) + **Delete my account** (type DELETE). Tested on Postgres in CI
+- [x] Short terms of use / privacy note at first sign-in (`backend/app/core/terms.py`, versioned). **Draft wording: have it reviewed (you / WCC) before the pilot**
+- [x] "Extend series" button when your recurring event ends within 3 weeks (extends to your role's limit; conflicting dates can be skipped)
+- [x] Offline: the service worker keeps the last answers from the API (network first, 4 s timeout) and the top bar says "Offline · saved copy"; cleared on sign-out (ADR-031)
 
 ---
 

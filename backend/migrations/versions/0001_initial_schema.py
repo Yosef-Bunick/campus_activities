@@ -2,7 +2,7 @@
 
 Revision ID: 0001
 Revises: 
-Create Date: 2026-10-05 22:57:28.138679
+Create Date: 2026-10-05 23:35:47.770127
 """
 
 from collections.abc import Sequence
@@ -40,6 +40,7 @@ def upgrade() -> None:
     sa.Column('role', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=False),
     sa.Column('is_banned', sa.Boolean(), nullable=False),
     sa.Column('major', sqlmodel.sql.sqltypes.AutoString(length=40), nullable=True),
+    sa.Column('terms_version', sa.Integer(), nullable=False),
     sa.Column('last_active_at', sa.DateTime(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
@@ -86,6 +87,18 @@ def upgrade() -> None:
     )
     with op.batch_alter_table('floor', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_floor_building_id'), ['building_id'], unique=False)
+
+    op.create_table('rulehit',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('kind', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('rulehit', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_rulehit_created_at'), ['created_at'], unique=False)
+        batch_op.create_index(batch_op.f('ix_rulehit_user_id'), ['user_id'], unique=False)
 
     op.create_table('userfavorite',
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -153,9 +166,11 @@ def upgrade() -> None:
     sa.Column('kind', sqlmodel.sql.sqltypes.AutoString(length=30), nullable=False),
     sa.Column('event_id', sa.Integer(), nullable=True),
     sa.Column('message', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
+    sa.Column('subject_user_id', sa.Integer(), nullable=True),
     sa.Column('read_at', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['event_id'], ['event.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['subject_user_id'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -177,6 +192,39 @@ def upgrade() -> None:
     )
     with op.batch_alter_table('hiddenevent', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_hiddenevent_user_id'), ['user_id'], unique=False)
+
+    op.create_table('moderationlog',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('actor_id', sa.Integer(), nullable=True),
+    sa.Column('action', sqlmodel.sql.sqltypes.AutoString(length=40), nullable=False),
+    sa.Column('target_user_id', sa.Integer(), nullable=True),
+    sa.Column('target_event_id', sa.Integer(), nullable=True),
+    sa.Column('detail', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['actor_id'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['target_event_id'], ['event.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['target_user_id'], ['user.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('moderationlog', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_moderationlog_created_at'), ['created_at'], unique=False)
+
+    op.create_table('report',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('reporter_id', sa.Integer(), nullable=True),
+    sa.Column('event_id', sa.Integer(), nullable=False),
+    sa.Column('reason', sqlmodel.sql.sqltypes.AutoString(length=300), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('resolved_by_id', sa.Integer(), nullable=True),
+    sa.Column('resolved_at', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['event_id'], ['event.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['reporter_id'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['resolved_by_id'], ['user.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('reporter_id', 'event_id', name='uq_report_once')
+    )
+    with op.batch_alter_table('report', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_report_event_id'), ['event_id'], unique=False)
 
     op.create_table('savedevent',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -203,6 +251,14 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_savedevent_user_id'))
 
     op.drop_table('savedevent')
+    with op.batch_alter_table('report', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_report_event_id'))
+
+    op.drop_table('report')
+    with op.batch_alter_table('moderationlog', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_moderationlog_created_at'))
+
+    op.drop_table('moderationlog')
     with op.batch_alter_table('hiddenevent', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_hiddenevent_user_id'))
 
@@ -225,6 +281,11 @@ def downgrade() -> None:
     op.drop_table('room')
     op.drop_table('userhidden')
     op.drop_table('userfavorite')
+    with op.batch_alter_table('rulehit', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_rulehit_user_id'))
+        batch_op.drop_index(batch_op.f('ix_rulehit_created_at'))
+
+    op.drop_table('rulehit')
     with op.batch_alter_table('floor', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_floor_building_id'))
 

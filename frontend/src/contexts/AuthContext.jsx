@@ -26,10 +26,14 @@ export function AuthProvider({ children }) {
     user: me?.user ?? null,
     permissions: me?.permissions ?? [],
     limits: me?.limits ?? null,
+    terms: me?.terms ?? null, // non-null = must agree before using the app
+    refresh: () => qc.invalidateQueries({ queryKey: ['me'] }),
     can: (perm) => Boolean(me?.permissions.includes(perm)),
     signOut: async () => {
       await apiPost('/auth/logout').catch(() => {});
       setCsrfToken('');
+      // Offline copies of the API belong to this person: drop them (ADR-031).
+      if (typeof caches !== 'undefined') caches.delete('api').catch(() => {});
       // Not qc.clear(): that drops the 'me' query this provider is subscribed
       // to, so the app would never see the sign-out. Null it, drop the rest.
       qc.setQueryData(['me'], null);

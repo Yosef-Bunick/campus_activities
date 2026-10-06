@@ -10,15 +10,22 @@ import { useLocation } from 'wouter';
 import ApiStatus from './ApiStatus';
 import { useAuth } from '../contexts/AuthContext';
 
-const MajorDialog = lazy(() => import('./MajorDialog'));
+// Dialogs download only when opened.
+const DIALOGS = {
+  major: lazy(() => import('./MajorDialog')),
+  modlog: lazy(() => import('./ModLogDialog')),
+  delete: lazy(() => import('./DeleteAccountDialog')),
+};
 
 // Top bar with the profile menu. /hidden lives here, not in the tab bar (architecture §3).
 export default function TopBar({ showProfile }) {
   const [, navigate] = useLocation();
   const [anchor, setAnchor] = useState(null);
-  const { user, signOut } = useAuth();
-  const [majorOpen, setMajorOpen] = useState(false);
+  const { user, signOut, can } = useAuth();
+  const [dialog, setDialog] = useState(null);
   const go = (path) => { setAnchor(null); navigate(path); };
+  const open = (name) => { setAnchor(null); setDialog(name); };
+  const Dialog = dialog && DIALOGS[dialog];
   return (
     <AppBar position="sticky" elevation={0} sx={{ pt: 'env(safe-area-inset-top)' }}>
       <Toolbar variant="dense" sx={{ gap: 1.5 }}>
@@ -33,15 +40,17 @@ export default function TopBar({ showProfile }) {
             </IconButton>
             <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
               {user && <MenuItem disabled>{user.display_name || user.email}</MenuItem>}
-              <MenuItem onClick={() => { setAnchor(null); setMajorOpen(true); }}>Your major</MenuItem>
+              <MenuItem onClick={() => open('major')}>Your major</MenuItem>
               <MenuItem onClick={() => go('/hidden')}>Hidden</MenuItem>
+              {can('modlog.view') && <MenuItem onClick={() => open('modlog')}>Moderation log</MenuItem>}
               <MenuItem onClick={async () => { setAnchor(null); await signOut(); navigate('/'); }}>Sign out</MenuItem>
+              <MenuItem onClick={() => open('delete')} sx={{ color: 'error.main' }}>Delete my account</MenuItem>
             </Menu>
           </>
         )}
       </Toolbar>
       <Suspense fallback={null}>
-        {majorOpen && <MajorDialog open onClose={() => setMajorOpen(false)} />}
+        {Dialog && <Dialog open onClose={() => setDialog(null)} />}
       </Suspense>
     </AppBar>
   );

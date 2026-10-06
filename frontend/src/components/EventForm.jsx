@@ -66,7 +66,14 @@ export default function EventForm({ event, open, onClose }) {
 
   const save = useMutation({
     mutationFn: (skip) => (editing ? apiPatch(`/events/${event.id}`, payload()) : apiPost('/events', payload(skip))),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['events'] }); onClose(); },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['events'] });
+      const waiting = Array.isArray(res) && res.filter((e) => e.status === 'pending_approval').length;
+      if (waiting) {
+        window.alert(`The room already has events at that time, so ${waiting === res.length ? 'this was' : `${waiting} date${waiting > 1 ? 's were' : ' was'}`} sent to Student Government for approval. You'll get an alert when they decide.`);
+      }
+      onClose();
+    },
     onError: (err) => setConflicts(err.status === 409 ? err.body.conflicts : null),
   });
 

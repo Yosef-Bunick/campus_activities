@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import { Redirect, Route, Switch, useLocation } from 'wouter';
@@ -7,6 +7,8 @@ import TopBar from './components/TopBar';
 import BottomTabs, { TAB_BAR_HEIGHT } from './components/BottomTabs';
 import { useAuth } from './contexts/AuthContext';
 import { FilterProvider } from './contexts/FilterContext';
+
+const TermsDialog = lazy(() => import('./components/TermsDialog'));
 
 function Loading() {
   return (
@@ -18,7 +20,7 @@ function Loading() {
 
 export default function App() {
   const [location] = useLocation();
-  const { user, loading } = useAuth();
+  const { user, loading, terms } = useAuth();
   if (loading) return <Loading />;
   // Signed-out people only get the sign-in page; signed-in people skip it.
   if (!user && location !== '/') return <Redirect to="/" replace />;
@@ -46,6 +48,8 @@ export default function App() {
         </Suspense>
       </Box>
       {signedInArea && <BottomTabs />}
+      {/* First sign-in (or new terms): agree before using the app. */}
+      {user && terms && <Suspense fallback={null}><TermsDialog /></Suspense>}
     </FilterProvider>
   );
 }

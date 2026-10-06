@@ -11,6 +11,7 @@ from app.core.auth import (
 )
 from app.core.database import get_session
 from app.core.majors import MAJORS, is_major
+from app.core.terms import TERMS, TERMS_VERSION
 from app.core.permissions import Role, limits_for, permissions_for
 from app.models.user import User
 from app.services import sessions
@@ -32,6 +33,9 @@ def me(request: Request, response: Response, user: User = Depends(current_user))
         "permissions": permissions_for(role),
         "limits": limits_for(role),
         "csrf_token": csrf,
+        # Shown once at first sign-in, and again whenever TERMS_VERSION changes.
+        "terms": None if user.terms_version >= TERMS_VERSION
+        else {"version": TERMS_VERSION, "items": TERMS},
     }
 
 
@@ -55,6 +59,41 @@ def set_major(
     session.add(user)
     session.commit()
     return {"major": user.major}
+
+
+class TermsBody(BaseModel):
+    version: int
+
+
+@router.post("/me/accept-terms")
+def accept_terms(
+    body: TermsBody, user: User = Depends(current_user), session: Session = Depends(get_session)
+) -> dict:
+    if body.version != TERMS_VERSION:
+        raise HTTPException(409, "The terms changed. Please reload.")
+    user.terms_version = TERMS_VERSION
+    session.add(user)
+    session.commit()
+    return {"ok": True}
+
+
+class DeleteBody(BaseModel):
+    confirm: str  # must be the literal "DELETE" (same guard as unified)
+
+
+@router.post("/me/delete")
+def delete_me(
+    body: DeleteBody, response: Response, user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:  # fmt: skip
+    """Delete my account and everything that's mine, now (architecture §9)."""
+    from app.services.purge import delete_user
+
+    if body.confirm != "DELETE":
+        raise HTTPException(400, 'Type DELETE to confirm')
+    delete_user(session, user)
+    clear_session_cookies(response)
+    return {"deleted": True}
 
 
 @router.post("/logout")

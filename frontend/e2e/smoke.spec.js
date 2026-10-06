@@ -14,6 +14,9 @@ test('a student signs in, posts an event, finds it, saves it, and sees the map',
   await expect(page).toHaveURL(/\/$/);
   await page.getByLabel('School email').fill(`smoke${Date.now()}@my.sunywcc.edu`);
   await page.getByRole('button', { name: 'Sign in (dev)' }).click();
+  // First sign-in: the terms / privacy note must be accepted.
+  await page.getByRole('button', { name: 'I agree' }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.getByRole('heading', { name: "What's on" })).toBeVisible();
 
   // Post an event for tomorrow 10–11am in TEC room 38.

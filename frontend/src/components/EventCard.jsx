@@ -32,6 +32,7 @@ export default function EventCard({ event, showDate = false }) {
   const [dialog, setDialog] = useState(null); // 'person' | 'cancel' | 'edit'
   const [menu, setMenu] = useState(null); // { anchor, kind: 'save' | 'calendar' }
   const cancelled = event.status === 'cancelled';
+  const pending = event.status === 'pending_approval';
   const mine = user?.id === event.creator?.id;
   const over = new Date(event.ends_at) <= new Date();
   const canCancel = !cancelled && !over && (mine || can('event.cancel_any'));
@@ -45,6 +46,29 @@ export default function EventCard({ event, showDate = false }) {
   const hide = useMutation({
     mutationFn: (scope) => apiPost(`/events/${event.id}/hide`, { scope }),
     onSuccess: refresh,
+  });
+  const report = useMutation({
+    mutationFn: (reason) => apiPost(`/events/${event.id}/report`, { reason }),
+    onSuccess: (r) => window.alert(r.already ? 'You already reported this event.' : 'Thanks. Moderators will take a look.'),
+  });
+  const onReport = () => {
+    const reason = window.prompt('Why are you reporting this event? (optional)');
+    if (reason !== null) report.mutate(reason.slice(0, 300));
+  };
+  // Offer "Extend series" on your own series when it ends within 3 weeks.
+  const endsSoon = event.series_ends_on
+    && (new Date(`${event.series_ends_on}T12:00:00Z`) - Date.now()) < 21 * 864e5;
+  const extend = useMutation({
+    mutationFn: (skip) => apiPost(`/series/${event.series_id}/extend`, { skip_dates: skip }),
+    onSuccess: (evs) => { refresh(); window.alert(`Added ${evs.length} more date${evs.length === 1 ? '' : 's'}.`); },
+    onError: (err) => {
+      if (err.status === 409) {
+        const list = err.body.conflicts.map((c) => `${c.date}: ${c.reason}`).join('\n');
+        if (window.confirm(`These dates don't work:\n${list}\n\nSkip them and extend anyway?`)) {
+          extend.mutate(err.body.conflicts.map((c) => c.date));
+        }
+      } else window.alert(err.message);
+    },
   });
   const onHide = (e) => {
     if (event.series_id) setMenu({ anchor: e.currentTarget, kind: 'hide' });
@@ -79,6 +103,7 @@ export default function EventCard({ event, showDate = false }) {
             {showDate && `${new Date(event.starts_at).toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric' })} · `}
             {fmtTime(event.starts_at)} – {fmtTime(event.ends_at)} · {roomLabel(event.room)}
             {cancelled && ' · Cancelled'}
+            {pending && ' · Waiting for approval'}
           </Typography>
         </CardActionArea>
         <IconButton
@@ -112,7 +137,13 @@ export default function EventCard({ event, showDate = false }) {
               </Button>
             )}
             {canEdit && <Button size="small" variant="outlined" onClick={() => setDialog('edit')}>Edit</Button>}
+            {mine && event.series_id && !cancelled && endsSoon && (
+              <Button size="small" variant="outlined" disabled={extend.isPending} onClick={() => extend.mutate([])}>
+                Extend series
+              </Button>
+            )}
             {!mine && <Button size="small" variant="outlined" color="inherit" onClick={onHide}>Hide</Button>}
+            {!mine && <Button size="small" color="inherit" onClick={onReport} disabled={report.isPending}>Report</Button>}
             {canCancel && (
               <Button size="small" color="error" variant="outlined" onClick={() => setDialog('cancel')}>
                 {event.series_id ? 'Cancel…' : 'Cancel event'}

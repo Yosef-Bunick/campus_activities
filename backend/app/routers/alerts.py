@@ -7,7 +7,7 @@ from sqlmodel import Session, func, select
 
 from app.core.auth import current_user
 from app.core.database import get_session
-from app.models.event import Alert
+from app.models.event import Alert, Event
 from app.models.user import User, as_utc
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -17,6 +17,11 @@ def _unread(session: Session, me: User) -> int:
     return session.exec(
         select(func.count()).select_from(Alert).where(Alert.user_id == me.id, Alert.read_at.is_(None))
     ).one()
+
+
+def _event_status(session: Session, event_id: int | None) -> str | None:
+    ev = session.get(Event, event_id) if event_id else None
+    return ev.status if ev else None
 
 
 @router.get("")
@@ -31,6 +36,9 @@ def list_alerts(me: User = Depends(current_user), session: Session = Depends(get
                 "id": a.id,
                 "kind": a.kind,
                 "event_id": a.event_id,
+                # Lets the page hide Approve/Reject once someone has decided.
+                "event_status": _event_status(session, a.event_id),
+                "subject_user_id": a.subject_user_id,
                 "message": a.message,
                 "read": a.read_at is not None,
                 "created_at": as_utc(a.created_at),

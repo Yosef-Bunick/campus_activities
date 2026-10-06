@@ -7,11 +7,12 @@ from datetime import UTC, datetime, time, timedelta
 from sqlmodel import Session, col, or_, select
 
 from app.core import permissions as P
-from app.models.event import Alert, Event, EventSeries, EventStatus, EventType
+from app.models.event import Alert, Event, EventSeries, EventStatus, EventType, Freq
 from app.models.place import Floor, Room
 from app.models.user import User, as_utc
 from app.schemas.events import CancelScope, EventCreate, EventFilter, EventUpdate
 from app.services import event_rules as R
+from app.services import moderation as M
 from app.services.recurrence import NY, expand, ny_date
 
 
@@ -38,7 +39,12 @@ def create(session: Session, user: User, body: EventCreate) -> list[Event]:
     R.check_type(user, body.type)
     R.check_times(body.starts_at, body.ends_at)
     room = _room(session, body.room_id)
-    R.check_daily_cap(session, user)
+    try:
+        R.check_daily_cap(session, user)
+    except R.RuleError:
+        M.record_hit(session, user, "daily_cap")
+        session.commit()
+        raise
 
     rep = body.repeat
     if rep is not None:
@@ -57,13 +63,7 @@ def create(session: Session, user: User, body: EventCreate) -> list[Event]:
     if not occurrences:
         raise R.RuleError("No dates left to create")
 
-    conflicts = []
-    for s, e in occurrences:
-        problem = R.occurrence_problem(session, user, room, s, e)
-        if problem:
-            conflicts.append({"date": ny_date(s).isoformat(), "starts_at": s, "reason": problem})
-    if conflicts:
-        raise Conflicts(conflicts)
+    check_dates(session, user, room, occurrences)
 
     series = None
     if rep is not None:
@@ -76,24 +76,101 @@ def create(session: Session, user: User, body: EventCreate) -> list[Event]:
         )
         session.add(series)
         session.flush()
+    template = {
+        "title": body.title.strip(), "description": body.description.strip(),
+        "type": body.type.value, "majors": pack_majors(body.majors),
+    }  # fmt: skip
+    return save_dates(session, user, room, occurrences, template, series)
+
+
+def check_dates(session: Session, user: User, room: Room, occurrences) -> set:
+    """Every date must pass the rules. A full room isn't a conflict any more
+    (Phase 2): those dates go to SGA/owner approval. Returns their start times."""
+    conflicts, pending = [], set()
+    for s, e in occurrences:
+        problem = R.occurrence_problem(session, user, room, s, e)
+        if problem == R.ROOM_FULL:
+            pending.add(s)
+        elif problem:
+            conflicts.append({"date": ny_date(s).isoformat(), "starts_at": s, "reason": problem})
+    if conflicts:
+        raise Conflicts(conflicts)
+    return pending
+
+
+def save_dates(
+    session: Session, user: User, room: Room, occurrences, template: dict,
+    series: EventSeries | None,
+) -> list[Event]:  # fmt: skip
+    pending = check_dates(session, user, room, occurrences)
     events = [
         Event(
-            series_id=series.id if series else None,
-            title=body.title.strip(),
-            description=body.description.strip(),
-            type=body.type.value,
-            room_id=room.id,
-            majors=pack_majors(body.majors),
-            starts_at=s,
-            ends_at=e,
-            creator_id=user.id,
-        )
+            series_id=series.id if series else None, room_id=room.id, starts_at=s, ends_at=e,
+            creator_id=user.id, **template,
+            status=EventStatus.PENDING.value if s in pending else EventStatus.ACTIVE.value,
+        )  # fmt: skip
         for s, e in occurrences
     ]
     session.add_all(events)
+    session.flush()
+    if pending:
+        first = next(ev for ev in events if ev.status == EventStatus.PENDING.value)
+        days = sorted({ny_date(s) for s in pending})
+        when = ", ".join(d.strftime("%a %b %d") for d in days[:5])
+        more = f" (+{len(days) - 5} more)" if len(days) > 5 else ""
+        M.notify(
+            session, "event.approve_overlap", "approval_needed",
+            f"{M.name(user)} wants “{template['title']}” in Room {room.name} on {when}{more}, "
+            f"while {room.max_overlapping or P.ROOM_MAX_OVERLAPPING} other events are there. "
+            "Approve or reject?",
+            event_id=first.id, subject_user_id=user.id,
+        )  # fmt: skip
+        M.record_hit(session, user, "room_full")
     session.commit()
     for ev in events:
         session.refresh(ev)
+    return events
+
+
+def extend_series(
+    session: Session, user: User, series_id: int, until=None, skip_dates=(),
+) -> list[Event]:  # fmt: skip
+    """Add dates to a series, up to the creator's schedule-ahead limit (Phase 2).
+    Same rules as creating; conflicting dates can be skipped."""
+    series = session.get(EventSeries, series_id)
+    if series is None:
+        raise R.RuleError("No such series", 404)
+    if series.creator_id != user.id and not P.can(P.Role(user.role), "event.edit_any"):
+        raise R.RuleError("You can only extend your own series", 403)
+    creator = session.get(User, series.creator_id)
+    rows = list(session.exec(
+        select(Event).where(Event.series_id == series_id).order_by(Event.starts_at)
+    ))  # fmt: skip
+    if not rows:
+        raise R.RuleError("This series has no dates")
+    first, last = rows[0], rows[-1]
+    limit = R.last_allowed_date(creator)
+    until = until or limit
+    if until > limit:
+        raise R.RuleError(f"A series can run at most until {limit}")
+    last_day = ny_date(as_utc(last.starts_at))
+    if until <= last_day:
+        raise R.RuleError(f"This series already runs until {last_day}")
+    weekdays = [int(d) for d in series.weekdays.split(",") if d]
+    skip = set(skip_dates)
+    occurrences = [
+        (s, e)
+        for s, e in expand(as_utc(first.starts_at), as_utc(first.ends_at), Freq(series.freq), until, weekdays)
+        if ny_date(s) > last_day and ny_date(s) not in skip
+    ]
+    if not occurrences:
+        raise R.RuleError("No new dates to add")
+    template = {"title": last.title, "description": last.description, "type": last.type,
+                "majors": last.majors}  # fmt: skip
+    events = save_dates(session, creator, _room(session, last.room_id), occurrences, template, series)
+    series.ends_on = until
+    session.add(series)
+    session.commit()
     return events
 
 
@@ -140,7 +217,8 @@ def _cancel_rows(session: Session, actor: User, rows: list[Event], reason: str) 
     now = datetime.now(UTC)
     count = 0
     for ev in rows:
-        if ev.status != EventStatus.ACTIVE.value or as_utc(ev.ends_at) <= now:
+        live = (EventStatus.ACTIVE.value, EventStatus.PENDING.value)
+        if ev.status not in live or as_utc(ev.ends_at) <= now:
             continue  # dates that already happened are never changed
         ev.status = EventStatus.CANCELLED.value
         ev.cancelled_by_id = actor.id
@@ -178,8 +256,41 @@ def cancel(session: Session, actor: User, event_id: int, scope: CancelScope, rea
         rows = list(session.exec(q))
     count = _cancel_rows(session, actor, rows, reason)
     _alert_creator(session, actor, ev, count, reason)
+    if count and actor.id != ev.creator_id:
+        creator = session.get(User, ev.creator_id)
+        M.log(session, actor, "cancel_event",
+              f"Cancelled {count} date(s) of “{ev.title}” by {M.name(creator)}"
+              + (f": {reason}" if reason else ""), target_user=creator, target_event=ev)  # fmt: skip
     session.commit()
     return count
+
+
+def decide(session: Session, actor: User, event_id: int, approve: bool, reason: str = "") -> int:
+    """SGA/owner approve or reject a pending event (and the rest of its series'
+    pending dates). The creator gets an alert either way."""
+    if not P.can(P.Role(actor.role), "event.approve_overlap"):
+        raise R.RuleError("You can't approve room overlaps", 403)
+    ev = _get(session, event_id)
+    if ev.status != EventStatus.PENDING.value:
+        raise R.RuleError("This event isn't waiting for approval", 409)
+    q = select(Event).where(Event.status == EventStatus.PENDING.value)
+    q = q.where(Event.series_id == ev.series_id) if ev.series_id else q.where(Event.id == ev.id)
+    rows = list(session.exec(q))
+    new = EventStatus.ACTIVE.value if approve else EventStatus.REJECTED.value
+    for row in rows:
+        row.status = new
+        row.updated_at = datetime.now(UTC)
+        session.add(row)
+    verb = "approved" if approve else "rejected"
+    what = f"“{ev.title}”" + (f" ({len(rows)} dates)" if len(rows) > 1 else "")
+    session.add(Alert(
+        user_id=ev.creator_id, kind=f"event_{verb}", event_id=ev.id,
+        message=f"{what} was {verb} by {M.name(actor)}" + (f": {reason}" if reason else ""),
+    ))  # fmt: skip
+    M.log(session, actor, "approve" if approve else "reject", f"{verb.capitalize()} {what}",
+          target_user=session.get(User, ev.creator_id), target_event=ev)  # fmt: skip
+    session.commit()
+    return len(rows)
 
 
 def cancel_upcoming_for_ban(session: Session, actor: User, user_id: int) -> int:
@@ -187,7 +298,7 @@ def cancel_upcoming_for_ban(session: Session, actor: User, user_id: int) -> int:
         session.exec(
             select(Event).where(
                 Event.creator_id == user_id,
-                Event.status == EventStatus.ACTIVE.value,
+                col(Event.status).in_([EventStatus.ACTIVE.value, EventStatus.PENDING.value]),
                 Event.ends_at > datetime.now(UTC),
             )
         )
@@ -232,10 +343,13 @@ def list_events(session: Session, f: EventFilter) -> list[Event]:
         q = select(Event).where(Event.starts_at <= now, Event.ends_at > now)
     else:
         q = select(Event).where(Event.starts_at < end, Event.ends_at > start)
-    q = q.where(
-        or_(Event.status == EventStatus.ACTIVE.value, Event.ends_at > now),
-        col(Event.type).in_([t.value for t in (f.types or list(EventType))]),
-    )
+    visible = [
+        Event.status == EventStatus.ACTIVE.value,
+        (Event.status == EventStatus.CANCELLED.value) & (Event.ends_at > now),
+    ]
+    if f.viewer_id is not None:  # your own events waiting for approval
+        visible.append((Event.status == EventStatus.PENDING.value) & (Event.creator_id == f.viewer_id))
+    q = q.where(or_(*visible), col(Event.type).in_([t.value for t in (f.types or list(EventType))]))
     if f.viewer_id is not None:
         q = exclude_hidden(q, f.viewer_id)
     if f.room_ids:

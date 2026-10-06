@@ -2,12 +2,14 @@ import os
 
 # Tests never touch dev.db: an in-memory SQLite (shared via StaticPool), and a
 # fixed owner + WCC tenant. Set before app.core.config is imported.
-os.environ["DATABASE_URL"] = "sqlite://"
+# CI also runs some files against real Postgres via TEST_DATABASE_URL.
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "sqlite://")
 os.environ["OWNER_EMAIL"] = "owner@gmail.com"
 os.environ["ALLOWED_TENANT_IDS"] = "4981a704-f6a3-4ac0-89c2-a3812354a3ff"
 os.environ["EMAIL_DOMAIN_REQUIREMENT"] = "sunywcc.edu"
 os.environ["FRONTEND_ORIGIN"] = "http://localhost:5173"
 os.environ["DEV_LOGIN"] = "0"
+os.environ["WORKER_ENABLED"] = "0"
 
 import itertools  # noqa: E402
 
@@ -16,6 +18,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlmodel import Session, SQLModel  # noqa: E402
 
 import app.models.event  # noqa: E402,F401  (registers tables)
+import app.models.moderation  # noqa: E402,F401
 import app.models.place  # noqa: E402,F401
 import app.models.social  # noqa: E402,F401
 import app.models.user  # noqa: E402,F401
