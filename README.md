@@ -1,0 +1,99 @@
+# Campus Events (working name)
+
+A campus-only app that shows **what's happening on campus right now**, from official events to club meetings to a few friends hanging out in a room.
+
+It's a **phone-first web app** that works on iPhone, Android, and desktop and can be added to your home screen like a regular app. Native store apps may come later.
+
+## Pages
+
+| URL | What it shows |
+|---|---|
+| `/home` | What's happening now and in the next few hours, plus **+ New event** |
+| `/calendar` | Every event on campus, by day, week, or list |
+| `/map` | The same events, placed on the campus map by room |
+| `/favorites` | Events from people you've favorited |
+| `/hidden` | People and events you've hidden |
+| `/alerts` | Notices, such as "your event was cancelled" |
+
+One **shared filter** controls both Calendar and Map.
+
+## Who can sign in
+
+- **Sign in with Microsoft.** Only Westchester Community College accounts (`@sunywcc.edu` and `@my.sunywcc.edu`) are allowed. 2FA comes from the college's Microsoft login, and we store no passwords.
+- The **Owner** is the only exception and can use any Microsoft account.
+- Accounts inactive for **150 days** are deleted automatically (except the owner).
+- Roles: **Owner → Manager → Student Government → Security → Student**. All roles, permissions, and scheduling limits live in one file: `backend/app/core/permissions.py`.
+
+## Events
+
+- Each event has exactly one type:
+  - `main_event`: official or campus-wide events
+  - `club_event`: events run by a club
+  - `friend_event`: informal meetups ("we're in room 204 studying")
+- You can schedule up to **3 months** ahead, or **1 year** for Student Government and above. Events can repeat.
+- Students can't have two of their own events at the same time.
+- A room can hold at most 2 overlapping events. A 3rd will need approval from SGA or the owner.
+
+Full rules are in [docs/architecture.md](docs/architecture.md#6-event-rules).
+
+## Stack
+
+The same stack as unified / Accounting Orbit: **React (Vite + MUI)**, installable as a PWA, with lazy-loaded pages; **FastAPI + SQLModel**; **PostgreSQL on Neon** (free tier). The frontend runs on Vercel and the API on Render.
+
+## Docs
+
+- [docs/roadmap.md](docs/roadmap.md): Phase 1 (bare bones), Phase 2 (rules & polish), and Later
+- [docs/architecture.md](docs/architecture.md): design, pages, rules, data model, and decisions (ADRs)
+
+## Repo layout (planned)
+
+```
+docs/            roadmap + architecture
+frontend/        React PWA (pages, components, tests)
+backend/         FastAPI: routers, services, models, permissions.py, tests
+.github/         CI workflows
+render.yaml      deployment
+```
+
+Milestone 0 (foundation) is in place: an empty-but-working backend and a PWA shell with placeholder pages.
+
+## Getting started
+
+Needs **Python 3.12** and **Node 22+**. No Docker.
+
+```bash
+cp .env.example .env              # defaults work for local dev
+```
+
+**Backend** (http://localhost:8000, health check at `/health`):
+
+```bash
+cd backend
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt      # macOS/Linux: .venv/bin/pip
+.venv/Scripts/python -m alembic upgrade head       # creates backend/dev.db (SQLite)
+.venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
+```
+
+**Frontend** (http://localhost:5173, in a second terminal):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The top bar shows **API ok** when the frontend can reach the backend. The frontend reads `VITE_API_BASE` (default `http://localhost:8000`); see `frontend/.env.example`.
+
+In the Claude desktop app, `.claude/launch.json` has `api`, `web`, and `web-prod` (a production build preview, where the PWA/service worker is active; run `npm run build` first).
+
+**Checks** (the same as CI; run only the side you changed):
+
+| Side | Commands |
+|---|---|
+| backend | `ruff check .` · `python -m alembic check` · `python -m pytest -q` |
+| frontend | `npm run lint` · `npm test` · `npm run build && npm run size` (fails over 150 KB gzipped first-load JS) |
+
+## License
+
+[CC BY-NC-ND 4.0](LICENSE) © Yosef Bunick. Contact the creator for commercial use or modified versions.

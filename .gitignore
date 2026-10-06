@@ -1,0 +1,36 @@
+# Env (DO NOT COMMIT)
+.env
+.env.*
+!.env.example
+
+# Database (DO NOT COMMIT)
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+dev-dist/
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Local notes / large source images (not part of the app)
+New Text Document.txt
+WCC_MAP.png

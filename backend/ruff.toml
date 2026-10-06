@@ -1,0 +1,11 @@
+# Same base as unified's ledger-core-pkg/backend/ruff.toml, without its parked debt.
+line-length = 100
+
+[lint]
+# flake8-bugbear (B) = likely-bug patterns; flake8-bandit (S) = security.
+extend-select = ["B", "S"]
+extend-ignore = [
+    "B008", # FastAPI `Depends(...)` in argument defaults is the framework idiom
+    "S101", # `assert` in tests
+    "E712", # SQLAlchemy filters require `== True/False`
+]

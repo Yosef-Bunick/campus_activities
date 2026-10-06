@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WCC Pin Map</title>
+<style>
+  :root { --bg:#f4f5f7; --panel:#fff; --line:#d9dce1; --text:#1c2230; --muted:#6b7280;
+          --accent:#2563eb; --danger:#dc2626; --pin:#e11d48; --ok:#16a34a; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text);
+         display:flex; flex-direction:column; height:100vh; }
+  header { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:8px 12px;
+           background:var(--panel); border-bottom:1px solid var(--line); }
+  button { font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:6px;
+           background:#fff; cursor:pointer; }
+  button:hover { background:#f0f2f5; }
+  button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { color:var(--danger); }
+  button.primary { background:var(--ok); border-color:var(--ok); color:#fff; }
+  #status { margin-left:auto; color:var(--muted); }
+  #status.dirty { color:var(--danger); font-weight:600; }
+  main { flex:1; display:flex; min-height:0; }
+  #viewport { flex:1; overflow:auto; padding:12px; cursor:grab; touch-action:none; }
+  #viewport.panning { cursor:grabbing; }
+  #zoomLbl { min-width:44px; text-align:center; color:var(--muted); }
+  #stage { position:relative; display:inline-block; user-select:none; }
+  #stage img { display:block; width:100%; height:auto; }
+  #stage.adding { cursor:crosshair; }
+  .pin { position:absolute; transform:translate(-50%,-50%); min-width:14px; height:14px; padding:0 2px;
+         border-radius:7px; background:var(--pin); color:#fff; font:700 9px/14px system-ui;
+         text-align:center; border:1px solid #fff; box-shadow:0 0 2px rgba(0,0,0,.5); cursor:pointer; }
+  .pin.sel { background:var(--accent); transform:translate(-50%,-50%) scale(1.3); z-index:2; }
+  aside { width:260px; background:var(--panel); border-left:1px solid var(--line); overflow:auto; }
+  aside h2 { font-size:13px; margin:0; padding:10px 12px; border-bottom:1px solid var(--line); color:var(--muted); }
+  .row { display:flex; gap:6px; align-items:center; padding:6px 12px; border-bottom:1px solid #eef0f3; }
+  .row.sel { background:#eaf1ff; }
+  .row b { width:28px; }
+  .row input { flex:1; min-width:0; padding:4px 6px; border:1px solid var(--line); border-radius:4px; font:inherit; }
+  .row button { padding:2px 8px; }
+  .empty { padding:12px; color:var(--muted); }
+  @media (max-width:700px) { main { flex-direction:column; } aside { width:auto; max-height:35vh; border-left:0; border-top:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <button id="addBtn" title="Then click on the map">＋ Add pin</button>
+  <button id="delBtn" class="danger" title="Delete the selected pin (or press Delete)">Delete selected</button>
+  <button id="saveBtn" class="primary">Save</button>
+  <button id="zoomOut" title="Zoom out">🔍−</button><span id="zoomLbl">100%</span><button id="zoomIn" title="Zoom in (or scroll wheel on the map)">🔍＋</button><button id="zoomFit" title="Fit map to screen">Fit</button>
+  <button id="exportBtn" title="Download pins as JSON (backup)">Export</button>
+  <button id="importBtn" title="Load pins from a JSON file">Import</button>
+  <input id="importFile" type="file" accept=".json,application/json" hidden>
+  <span id="status">Loading…</span>
+</header>
+<main>
+  <div id="viewport"><div id="stage"><img id="map" src="WCC_MAP2.png" alt="WCC campus map" draggable="false"></div></div>
+  <aside><h2>PINS</h2><div id="list"></div></aside>
+</main>
+<script>
+const KEY = 'wcc-pin-map-v1';
+const $ = id => document.getElementById(id);
+const stage = $('stage'), img = $('map'), list = $('list'), status = $('status');
+
+let pins = [];          // { n, x, y, label }  x/y = 0..1 of image size
+let selected = null;    // pin number
+let adding = false;
+let dirty = false;
+let zoom = 1;
+
+function load() {
+  try { pins = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { pins = []; }
+  setDirty(false, pins.length ? `Loaded ${pins.length} saved pins` : 'No saved pins yet');
+}
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(pins));
+    setDirty(false, `Saved ${pins.length} pins · ${new Date().toLocaleTimeString()}`);
+  } catch (e) { alert('Could not save in this browser: ' + e.message + '\nUse Export instead.'); }
+}
+function setDirty(d, msg) {
+  dirty = d;
+  status.textContent = msg || (d ? 'Unsaved changes' : 'Saved');
+  status.classList.toggle('dirty', d);
+}
+// Lowest free number, so deleting #2 and re-placing it gives #2 again.
+function nextNumber() { const used = new Set(pins.map(p => p.n)); let n = 1; while (used.has(n)) n++; return n; }
+
+function render() {
+  stage.querySelectorAll('.pin').forEach(el => el.remove());
+  for (const p of pins) {
+    const el = document.createElement('div');
+    el.className = 'pin' + (p.n === selected ? ' sel' : '');
+    el.style.left = (p.x * 100) + '%';
+    el.style.top = (p.y * 100) + '%';
+    el.textContent = p.n;
+    el.title = p.label ? `${p.n} · ${p.label}` : `Pin ${p.n}`;
+    el.onclick = e => { e.stopPropagation(); select(p.n); };
+    stage.appendChild(el);
+  }
+  list.innerHTML = pins.length ? '' : '<div class="empty">Click “＋ Add pin”, then click the map.</div>';
+  for (const p of [...pins].sort((a, b) => a.n - b.n)) {
+    const row = document.createElement('div');
+    row.className = 'row' + (p.n === selected ? ' sel' : '');
+    row.innerHTML = `<b>${p.n}</b><input placeholder="name (optional)"><button class="danger" title="Delete">✕</button>`;
+    const input = row.querySelector('input');
+    input.value = p.label || '';
+    input.oninput = () => { p.label = input.value; setDirty(true); };
+    input.onfocus = () => { if (selected !== p.n) { selected = p.n; renderPins(); markRows(); } };
+    row.querySelector('button').onclick = () => remove(p.n);
+    row.onclick = e => { if (e.target === row || e.target.tagName === 'B') select(p.n); };
+    row.dataset.n = p.n;
+    list.appendChild(row);
+  }
+}
+function renderPins() {
+  stage.querySelectorAll('.pin').forEach(el => el.classList.toggle('sel', +el.textContent === selected));
+}
+function markRows() {
+  list.querySelectorAll('.row').forEach(r => r.classList.toggle('sel', +r.dataset.n === selected));
+}
+function select(n) {
+  selected = selected === n ? null : n;
+  renderPins(); markRows();
+  const row = list.querySelector(`.row[data-n="${n}"]`);
+  if (row && selected) row.scrollIntoView({ block: 'nearest' });
+}
+function remove(n) {
+  if (n == null) return;
+  pins = pins.filter(p => p.n !== n);
+  if (selected === n) selected = null;
+  setDirty(true); render();
+}
+function setAdding(on) {
+  adding = on;
+  $('addBtn').classList.toggle('on', on);
+  $('addBtn').textContent = on ? 'Adding… (click map, Esc to stop)' : '＋ Add pin';
+  stage.classList.toggle('adding', on);
+}
+const viewport = $('viewport');
+// Zoom, keeping the map point under (cx, cy) in place. Defaults to the viewport centre.
+function setZoom(z, cx, cy) {
+  const vr = viewport.getBoundingClientRect();
+  if (cx == null) { cx = vr.left + vr.width / 2; cy = vr.top + vr.height / 2; }
+  const r = img.getBoundingClientRect();
+  const fx = (cx - r.left) / r.width, fy = (cy - r.top) / r.height;
+  zoom = Math.min(6, Math.max(0.3, z));
+  stage.style.width = (img.naturalWidth * zoom) + 'px';
+  const r2 = img.getBoundingClientRect();
+  viewport.scrollLeft += (r2.left + fx * r2.width) - cx;
+  viewport.scrollTop += (r2.top + fy * r2.height) - cy;
+  $('zoomLbl').textContent = Math.round(zoom * 100) + '%';
+}
+function fitZoom() {
+  const vr = viewport.getBoundingClientRect();
+  setZoom(Math.min((vr.width - 24) / img.naturalWidth, (vr.height - 24) / img.naturalHeight));
+}
+
+// Scroll wheel / trackpad pinch = zoom at the cursor
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const d = Math.max(-50, Math.min(50, e.deltaY));     // one mouse notch ≈ 15%
+  setZoom(zoom * Math.exp(-d * (e.ctrlKey ? 0.01 : 0.003)), e.clientX, e.clientY);
+}, { passive: false });
+
+// Drag = pan. A drag never counts as a click, so it won't drop a pin.
+let drag = null, justPanned = false;
+viewport.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  drag = { x: e.clientX, y: e.clientY, sl: viewport.scrollLeft, st: viewport.scrollTop, moved: false };
+});
+window.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+  drag.moved = true; viewport.classList.add('panning');
+  viewport.scrollLeft = drag.sl - dx; viewport.scrollTop = drag.st - dy;
+});
+window.addEventListener('pointerup', () => {
+  if (drag?.moved) { justPanned = true; setTimeout(() => justPanned = false, 0); }
+  drag = null; viewport.classList.remove('panning');
+});
+viewport.addEventListener('click', e => { if (justPanned) { e.stopPropagation(); e.preventDefault(); } }, true);
+
+stage.addEventListener('click', e => {
+  if (!adding) { selected = null; renderPins(); markRows(); return; }
+  const r = img.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return;
+  const p = { n: nextNumber(), x: +x.toFixed(4), y: +y.toFixed(4), label: '' };
+  pins.push(p); selected = p.n;
+  setDirty(true); render();
+});
+
+$('addBtn').onclick = () => setAdding(!adding);
+$('delBtn').onclick = () => selected ? remove(selected) : alert('Click a pin first to select it.');
+$('saveBtn').onclick = save;
+$('zoomIn').onclick = () => setZoom(zoom * 1.25);
+$('zoomOut').onclick = () => setZoom(zoom / 1.25);
+$('zoomFit').onclick = fitZoom;
+$('exportBtn').onclick = () => {
+  const data = { image: 'WCC_MAP2.png', width: img.naturalWidth, height: img.naturalHeight,
+    pins: pins.map(p => ({ ...p, px: Math.round(p.x * img.naturalWidth), py: Math.round(p.y * img.naturalHeight) })) };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = 'wcc-pins.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const arr = Array.isArray(data) ? data : data.pins;
+    if (!Array.isArray(arr)) throw new Error('no pins array');
+    if (pins.length && !confirm(`Replace the ${pins.length} current pins with ${arr.length} from the file?`)) return;
+    pins = arr.map(p => ({ n: +p.n, x: +p.x, y: +p.y, label: p.label || '' }));
+    selected = null; setDirty(true, `Imported ${pins.length} pins, click Save to keep them`); render();
+  } catch (err) { alert('Could not read that file: ' + err.message); }
+  e.target.value = '';
+};
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Escape') setAdding(false);
+  if (e.key === '+' || e.key === '=') setZoom(zoom * 1.25);
+  if (e.key === '-') setZoom(zoom / 1.25);
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selected) { e.preventDefault(); remove(selected); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+});
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+img.onload = fitZoom;
+img.onerror = () => { status.textContent = 'Could not load WCC_MAP2.png, keep it in the same folder as this file'; };
+if (img.complete && img.naturalWidth) img.onload();
+load(); render();
+</script>
+</body>
+</html>
