@@ -61,8 +61,19 @@ describe('App shell (signed in)', () => {
 
   it('sends signed-in users from / to /home', async () => {
     const loc = renderAt('/', ME);
-    expect(await screen.findByRole('heading', { name: 'Happening now' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: "What's on" })).toBeTruthy();
     expect(loc.history.at(-1)).toBe('/home');
+  });
+});
+
+describe('Home chips', () => {
+  it('asks the API for the chosen window and for Recommended', async () => {
+    renderAt('/home', ME);
+    fireEvent.click(await screen.findByRole('button', { name: 'Now' }));
+    await waitFor(() => expect(fetch.mock.calls.some(([u]) => u.includes('happening_now=true'))).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Recommended' }));
+    await waitFor(() => expect(fetch.mock.calls.some(([u]) => u.includes('recommended=true'))).toBe(true));
+    expect(screen.getByRole('button', { name: 'Set your major for more' })).toBeTruthy();
   });
 });
 

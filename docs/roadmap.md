@@ -56,25 +56,30 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 - [x] Tapping a creator's name opens the person sheet
 - [x] Rooms: the 4 test rooms from `pin-map.html` (38, 26, 25D on floor 1; 108 on floor 2) in a placeholder "Test building", seeded by `python -m app.seed`
 - [x] **`/home`**: happening now + next 4 hours, plus a **+ New event** button
+- [x] Home **time chips** (Now · Next 4h · Today · This week) and a **Recommended** chip: main events + events tagged for your major (ADR-028). Pick your major in the profile menu; tag up to 3 majors on an event
+- [ ] Replace the placeholder majors in `backend/app/core/majors.py` with WCC's real program list
 - [x] **`/calendar`**: day / week / list
 - [x] **Shared filter** (bottom sheet on phones), synced to the URL and shared by Calendar and Map
 - [x] Times stored in UTC and shown in New York time (`tzdata` on the server, the browser's `Intl` on phones; ADR-021)
 - [ ] You try it on your phone-size screen and say it feels right
+- [x] **Add to calendar** on every event: `.ics` (Apple, Outlook, Samsung, Linux) and a Google Calendar link (ADR-026)
 
 **Done when:** a student can post "studying in 204, 3 to 5pm, every Tuesday" from their phone, and everyone sees it.
 
-## Milestone 3: Map ⬜
-- [ ] Mapping pass: every building, floor, room, and outdoor spot gets an ID
-- [ ] SVG floor plans (lazy-loaded per floor) with tappable rooms and pinch-zoom
-- [ ] **`/map`**: rooms badged with their events, using the same shared filter
-- [ ] Tap a room to see its events
+## Milestone 3: Map 🟨
+- [ ] Mapping pass: every building, floor, room, and outdoor spot gets an ID. *4 test rooms so far in **TEC** (38, 26, 25D on floor 1; 108 on floor 2), pinned on `WCC_MAP2.png`. Needs the full room list*
+- [x] Campus map (`WCC_MAP2.png` as a 73 KB WebP, loaded only on `/map`) with room pins, pinch-zoom and +/− buttons
+- [ ] SVG floor plans (lazy-loaded per floor) with tappable rooms. *Waiting for the real plans from facilities (2026-10-06 decision); the campus-map pins work until then*
+- [x] **`/map`**: rooms badged with their event count (Now / Today), using the same shared filter
+- [x] Tap a room to see its events
 
 **Done when:** you can open the map on your phone and see which rooms have something going on right now.
 
 ## Milestone 4: Favorites, Hidden, Alerts ⬜
-- [ ] **`/favorites`**: events from people you favorited
+- [x] **`/favorites`**: ★ saved events (one date or a whole series) and events from people you favorite (♥ in the person sheet). Pulled forward at your request (ADR-025)
 - [ ] **`/hidden`**: people and events/series you've hidden, with Unhide
-- [ ] Turn on the person sheet's Favorite / Hide buttons (`UserFavorite`, `UserHidden`)
+- [x] Person sheet **Favorite** button (`UserFavorite`)
+- [ ] Person sheet **Hide** button (`UserHidden`)
 - [ ] **`/alerts`**: "your event was cancelled" notices, with a read/unread state
 - [ ] Deploy (Vercel frontend + Render API + **Neon** database), turn on Sentry, and **pilot with a small group**
   - [ ] `render.yaml` (API only) + Postgres driver (`psycopg2-binary`, as unified) in `requirements.txt`; run `alembic upgrade head` on start
@@ -101,7 +106,8 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 ---
 
 # Later (not scheduled)
-- **Proposed (needs your OK):** a more "calendar" Home: **Recommended** events, **Saved** events (★ an event, new `SavedEvent` table), and time chips (Now · Next 4h · Today · This week)
+- Follow a **club** (not just a person) once clubs exist as entities
+- Calendar **subscription feed** (webcal) of your saved events, so new ones appear automatically
 - **Native iPhone + Android apps**, by wrapping the same React build with Capacitor
 - **Push notifications** (PWA push works on Android, and on iPhone once added to the home screen)
 - **Immersive map:** full campus video / 360° / 3D linked to the same rooms

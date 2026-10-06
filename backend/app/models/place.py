@@ -25,4 +25,7 @@ class Room(SQLModel, table=True):
     # pin from pin-map.html, e.g. "pin:1".
     shape_ref: str | None = Field(default=None, max_length=60)
     is_outdoor: bool = False
+    # Position on the campus map image (0..1 of its width/height), from pin-map.html.
+    map_x: float | None = None
+    map_y: float | None = None
     max_overlapping: int | None = None  # None = permissions.ROOM_MAX_OVERLAPPING

@@ -15,3 +15,7 @@ export function useEvents(params) {
 export function useRooms() {
   return useQuery({ queryKey: ['rooms'], queryFn: () => apiGet('/rooms'), staleTime: 10 * 60000 });
 }
+
+export function useMajors() {
+  return useQuery({ queryKey: ['majors'], queryFn: () => apiGet('/auth/majors'), staleTime: 60 * 60000 });
+}

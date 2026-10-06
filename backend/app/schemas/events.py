@@ -7,7 +7,17 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.majors import MAX_EVENT_MAJORS, is_major
 from app.models.event import EventType, Freq
+
+
+def _majors(v: list[str] | None) -> list[str] | None:
+    if v is None:
+        return v
+    v = sorted(set(v))
+    if len(v) > MAX_EVENT_MAJORS or not all(is_major(m) for m in v):
+        raise ValueError(f"pick up to {MAX_EVENT_MAJORS} majors from the list")
+    return v
 
 
 def _aware(v: datetime) -> datetime:
@@ -36,11 +46,13 @@ class EventCreate(BaseModel):
     room_id: int
     starts_at: datetime
     ends_at: datetime
+    majors: list[str] = Field(default_factory=list)  # relevant majors (Recommended)
     repeat: Repeat | None = None
     # Dates (New York) the user chose to skip after seeing conflicts.
     skip_dates: list[date] = Field(default_factory=list)
 
     _tz = field_validator("starts_at", "ends_at")(_aware)
+    _mj = field_validator("majors")(_majors)
 
 
 class EventUpdate(BaseModel):
@@ -51,6 +63,9 @@ class EventUpdate(BaseModel):
     room_id: int | None = None
     starts_at: datetime | None = None
     ends_at: datetime | None = None
+    majors: list[str] | None = None
+
+    _mj = field_validator("majors")(_majors)
 
     @field_validator("starts_at", "ends_at")
     @classmethod
@@ -77,4 +92,6 @@ class EventFilter(BaseModel):
     building_ids: list[int] = Field(default_factory=list)
     room_ids: list[int] = Field(default_factory=list)
     favorites_only: bool = False  # Milestone 4
+    # Recommended (ADR-028): main events, or events tagged with this major.
+    recommended_for: str | None = None
     search: str = ""

@@ -17,6 +17,7 @@ from sqlmodel import Session, SQLModel  # noqa: E402
 
 import app.models.event  # noqa: E402,F401  (registers tables)
 import app.models.place  # noqa: E402,F401
+import app.models.social  # noqa: E402,F401
 import app.models.user  # noqa: E402,F401
 from app.core.auth import CSRF_COOKIE, SESSION_COOKIE  # noqa: E402
 from app.core.database import engine  # noqa: E402

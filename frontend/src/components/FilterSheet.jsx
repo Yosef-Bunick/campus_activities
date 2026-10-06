@@ -8,7 +8,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { EVENT_TYPES, useFilter } from '../contexts/FilterContext';
 import { useRooms } from '../hooks/useEvents';
-import { TYPE_LABEL, roomLabel } from './EventCard';
+import { TYPE_LABEL, roomLabel } from '../lib/labels';
 
 // The shared filter as a bottom sheet (phones). Same filter drives Calendar and Map.
 export default function FilterSheet({ open, onClose }) {

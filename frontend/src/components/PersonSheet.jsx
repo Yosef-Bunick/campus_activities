@@ -33,11 +33,15 @@ export default function PersonSheet({ userId, open, onClose }) {
     mutationFn: () => apiPost(`/users/${userId}/${person.is_banned ? 'unban' : 'ban'}`),
     onSuccess: refresh,
   });
+  const fav = useMutation({
+    mutationFn: () => apiPost(`/users/${userId}/${person.is_favorite ? 'unfavorite' : 'favorite'}`),
+    onSuccess: () => { refresh(); qc.invalidateQueries({ queryKey: ['favorites'] }); },
+  });
   const changeRole = useMutation({
     mutationFn: (newRole) => apiPut(`/users/${userId}/role`, { role: newRole }),
     onSuccess: refresh,
   });
-  const actionError = ban.error || changeRole.error;
+  const actionError = ban.error || changeRole.error || fav.error;
 
   return (
     <Drawer anchor="bottom" open={open} onClose={onClose} PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16 } }}>
@@ -52,8 +56,12 @@ export default function PersonSheet({ userId, open, onClose }) {
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              {/* Favorites and hiding are stored in Milestone 4. */}
-              {person.actions.favorite && <Button variant="outlined" disabled fullWidth>Favorite</Button>}
+              {person.actions.favorite && (
+                <Button variant={person.is_favorite ? 'contained' : 'outlined'} fullWidth disabled={fav.isPending} onClick={() => fav.mutate()}>
+                  {person.is_favorite ? 'Favorited' : 'Favorite'}
+                </Button>
+              )}
+              {/* Hiding is stored in Milestone 4. */}
               {person.actions.hide && <Button variant="outlined" disabled fullWidth>Hide</Button>}
             </Box>
             {person.actions.change_role && (

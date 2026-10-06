@@ -14,9 +14,9 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPatch, apiPost } from '../api';
 import { useAuth } from '../contexts/AuthContext';
-import { useRooms } from '../hooks/useEvents';
+import { useMajors, useRooms } from '../hooks/useEvents';
 import { addDays, fmtDay, nyDateKey, nyTimeKey, nyToDate, weekday } from '../lib/time';
-import { TYPE_LABEL, roomLabel } from './EventCard';
+import { TYPE_LABEL, roomLabel } from '../lib/labels';
 
 const TYPE_PERM = { friend_event: 'event.create.friend', club_event: 'event.create.club', main_event: 'event.create.main' };
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -27,6 +27,7 @@ export default function EventForm({ event, open, onClose }) {
   const qc = useQueryClient();
   const { can, limits } = useAuth();
   const { data: rooms = [] } = useRooms();
+  const { data: majors = [] } = useMajors();
   const phone = useMediaQuery('(max-width:600px)');
   const today = nyDateKey();
   const lastDay = addDays(today, limits?.max_days_ahead ?? 90);
@@ -35,6 +36,7 @@ export default function EventForm({ event, open, onClose }) {
   const [f, setF] = useState(() => ({
     title: event?.title ?? '',
     description: event?.description ?? '',
+    majors: event?.majors ?? [],
     type: event?.type ?? 'friend_event',
     room_id: event?.room?.id ?? '',
     date: event ? nyDateKey(event.starts_at) : today,
@@ -52,7 +54,7 @@ export default function EventForm({ event, open, onClose }) {
     let endsAt = nyToDate(f.date, f.end);
     if (endsAt <= startsAt) endsAt = nyToDate(addDays(f.date, 1), f.end); // ends after midnight
     const base = {
-      title: f.title, description: f.description, room_id: Number(f.room_id),
+      title: f.title, description: f.description, room_id: Number(f.room_id), majors: f.majors,
       starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(),
     };
     if (editing) return base;
@@ -120,6 +122,14 @@ export default function EventForm({ event, open, onClose }) {
             )}
           </>
         )}
+        <TextField
+          select label="Relevant to majors (optional)" value={f.majors}
+          SelectProps={{ multiple: true }}
+          onChange={(e) => setF((p) => ({ ...p, majors: e.target.value.slice(0, 3) }))}
+          helperText="Shows up as Recommended for those majors. Up to 3."
+        >
+          {majors.map((m) => <MenuItem key={m.key} value={m.key}>{m.label}</MenuItem>)}
+        </TextField>
         <TextField label="Details (optional)" value={f.description} onChange={set('description')} multiline minRows={2} inputProps={{ maxLength: 2000 }} />
         {conflicts && (
           <Box role="alert" sx={{ bgcolor: 'warning.light', p: 1.5, borderRadius: 1 }}>

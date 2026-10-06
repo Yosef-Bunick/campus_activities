@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.core.auth import (
@@ -9,6 +10,7 @@ from app.core.auth import (
     set_csrf_cookie,
 )
 from app.core.database import get_session
+from app.core.majors import MAJORS, is_major
 from app.core.permissions import Role, limits_for, permissions_for
 from app.models.user import User
 from app.services import sessions
@@ -26,11 +28,33 @@ def me(request: Request, response: Response, user: User = Depends(current_user))
     csrf = request.cookies.get(CSRF_COOKIE) or set_csrf_cookie(response)
     role = Role(user.role)
     return {
-        "user": {**user_public(user), "email": user.email},
+        "user": {**user_public(user), "email": user.email, "major": user.major},
         "permissions": permissions_for(role),
         "limits": limits_for(role),
         "csrf_token": csrf,
     }
+
+
+@router.get("/majors")
+def majors(_: User = Depends(current_user)) -> list[dict]:
+    """The pickable majors (core/majors.py)."""
+    return [{"key": k, "label": v} for k, v in MAJORS.items()]
+
+
+class MajorBody(BaseModel):
+    major: str | None
+
+
+@router.put("/me/major")
+def set_major(
+    body: MajorBody, user: User = Depends(current_user), session: Session = Depends(get_session)
+) -> dict:
+    if body.major is not None and not is_major(body.major):
+        raise HTTPException(400, "Unknown major")
+    user.major = body.major
+    session.add(user)
+    session.commit()
+    return {"major": user.major}
 
 
 @router.post("/logout")

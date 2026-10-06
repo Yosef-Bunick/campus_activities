@@ -22,6 +22,15 @@ from app.core.config import settings
 
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
 
+# Sign-in runs before a (valid) session exists, so there is nothing to protect
+# yet, and a stale session cookie (expired, or from a reset dev.db) must not
+# lock people out of signing in again. Same list idea as unified's
+# CSRF_EXEMPT_PREFIXES (R29-P0-SEC-3).
+EXEMPT_PREFIXES = ("/auth/dev-login", "/auth/microsoft/")
+# Logout is exempt when it comes from the app's own Origin (unified R40): a
+# signed-out page with a stale cookie has no CSRF token to send.
+LOGOUT = "/auth/logout"
+
 
 def _origin_allowed(request) -> bool:
     origin = request.headers.get("origin", "")
@@ -38,7 +47,11 @@ def _origin_allowed(request) -> bool:
 
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        if request.method in UNSAFE and SESSION_COOKIE in request.cookies:
+        path = request.url.path
+        exempt = path.startswith(EXEMPT_PREFIXES) or (
+            path == LOGOUT and request.headers.get("origin") == settings.frontend_origin
+        )
+        if request.method in UNSAFE and SESSION_COOKIE in request.cookies and not exempt:
             if not _origin_allowed(request):
                 return JSONResponse({"detail": "Cross-origin request rejected"}, status_code=403)
             cookie = request.cookies.get(CSRF_COOKIE, "")

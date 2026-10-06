@@ -55,7 +55,7 @@ backend/         FastAPI: routers, services, models, permissions.py, tests
 render.yaml      deployment
 ```
 
-Milestones 0–2 are built: foundation, roles and sessions, and events (Home, Calendar, shared filter). The Microsoft login waits on the Entra app registration; until then use the local developer sign-in.
+Milestones 0–2 are built (foundation, roles and sessions, events with Home, Calendar and the shared filter), plus the campus Map, Favorites (★ saved events, ♥ people), Add to calendar, and Home time chips with Recommended (main events + your major). The Microsoft login waits on the Entra app registration; until then use the local developer sign-in.
 
 ## Getting started
 
@@ -84,7 +84,7 @@ npm install
 npm run dev
 ```
 
-The top bar shows **API ok** when the frontend can reach the backend. Signed-out visitors only see the sign-in page; the **Sign in with Microsoft** button turns on once `MS_CLIENT_ID` / `MS_CLIENT_SECRET` / `OWNER_EMAIL` are in `.env` and the Microsoft login route lands. Roles and limits: edit `backend/app/core/permissions.py`.
+The top bar shows **API ok** when the frontend can reach the backend. Signed-out visitors only see the sign-in page; the **Sign in with Microsoft** button turns on once `MS_CLIENT_ID` / `MS_CLIENT_SECRET` / `OWNER_EMAIL` are in `.env` and the Microsoft login route lands. Roles and limits: edit `backend/app/core/permissions.py`. Majors (for Recommended): edit `backend/app/core/majors.py`.
 
 **Testing without Microsoft:** set `DEV_LOGIN=1` in `.env` (localhost only). The sign-in page then shows a "Local testing only" form: type a school email, pick a role, sign in. No passwords.
 

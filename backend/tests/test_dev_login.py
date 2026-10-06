@@ -34,3 +34,19 @@ def test_signs_in_with_chosen_role(db, enabled):
 def test_still_gated_to_school_domains(db, enabled):
     r = client_for(db).post("/auth/dev-login", json={"email": "a@fakesunywcc.edu"})
     assert r.status_code == 403
+
+
+def test_stale_session_cookie_does_not_block_signing_in(db, enabled):
+    c = client_for(db)
+    c.cookies.set("session", "stale-token-from-a-reset-db")
+    assert c.post("/auth/dev-login", json={"email": "a@my.sunywcc.edu"}).status_code == 200
+    assert c.get("/auth/me").status_code == 200
+
+
+def test_logout_from_the_app_origin_works_without_a_token(db):
+    from tests.conftest import make_user
+
+    c = client_for(db, make_user(db))
+    del c.headers["X-CSRF-Token"]
+    assert c.post("/auth/logout", headers={"Origin": "http://localhost:5173"}).status_code == 200
+    assert c.get("/auth/me").status_code == 401

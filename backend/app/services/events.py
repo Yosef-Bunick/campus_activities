@@ -23,6 +23,10 @@ class Conflicts(Exception):
         self.conflicts = conflicts
 
 
+def pack_majors(majors: list[str]) -> str:
+    return f",{','.join(majors)}," if majors else ""
+
+
 def _room(session: Session, room_id: int) -> Room:
     room = session.get(Room, room_id)
     if room is None:
@@ -79,6 +83,7 @@ def create(session: Session, user: User, body: EventCreate) -> list[Event]:
             description=body.description.strip(),
             type=body.type.value,
             room_id=room.id,
+            majors=pack_majors(body.majors),
             starts_at=s,
             ends_at=e,
             creator_id=user.id,
@@ -121,6 +126,8 @@ def update(session: Session, user: User, event_id: int, body: EventUpdate) -> Ev
         value = getattr(body, field)
         if value is not None:
             setattr(ev, field, value.strip())
+    if body.majors is not None:
+        ev.majors = pack_majors(body.majors)
     ev.room_id, ev.starts_at, ev.ends_at = room.id, starts_at, ends_at
     ev.updated_at = datetime.now(UTC)
     session.add(ev)
@@ -212,6 +219,11 @@ def list_events(session: Session, f: EventFilter) -> list[Event]:
     )
     if f.room_ids:
         q = q.where(col(Event.room_id).in_(f.room_ids))
+    if f.recommended_for is not None:
+        rec = [Event.type == EventType.MAIN.value]
+        if f.recommended_for:
+            rec.append(col(Event.majors).like(f"%,{f.recommended_for},%"))
+        q = q.where(or_(*rec))
     if f.building_ids:
         q = q.join(Room, Room.id == Event.room_id).join(Floor, Floor.id == Room.floor_id).where(
             col(Floor.building_id).in_(f.building_ids)

@@ -46,6 +46,8 @@ class Event(SQLModel, table=True):
     description: str = Field(default="", max_length=2000)
     type: str = Field(max_length=20)  # exactly one EventType value
     room_id: int = Field(foreign_key="room.id", index=True)
+    # Majors this event is relevant to, stored ",key1,key2," so a LIKE match is exact.
+    majors: str = Field(default="", max_length=200)
     starts_at: datetime = Field(index=True)  # UTC
     ends_at: datetime = Field(index=True)  # UTC
     creator_id: int = Field(foreign_key="user.id", index=True, ondelete="CASCADE")

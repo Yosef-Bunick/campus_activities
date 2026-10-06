@@ -44,13 +44,25 @@ def rooms_out(session: Session) -> dict[int, dict]:
             "building_id": b.id if b else None,
             "building": b.name if b else None,
             "is_outdoor": r.is_outdoor,
+            "map_x": r.map_x,
+            "map_y": r.map_y,
         }
         for r, f, b in rows
     }
 
 
-def events_out(session: Session, events: list[Event]) -> list[dict]:
+def _saved_by(session: Session, viewer: User | None) -> tuple[set[int], set[int]]:
+    from app.models.social import SavedEvent
+
+    if viewer is None:
+        return set(), set()
+    rows = list(session.exec(select(SavedEvent).where(SavedEvent.user_id == viewer.id)))
+    return {r.event_id for r in rows if r.event_id}, {r.series_id for r in rows if r.series_id}
+
+
+def events_out(session: Session, events: list[Event], viewer: User | None = None) -> list[dict]:
     rooms = rooms_out(session)
+    saved_events, saved_series = _saved_by(session, viewer)
     ids = {e.creator_id for e in events}
     people = (
         {u.id: u for u in session.exec(select(User).where(col(User.id).in_(ids)))} if ids else {}
@@ -70,6 +82,11 @@ def events_out(session: Session, events: list[Event]) -> list[dict]:
             if e.creator_id in people
             else None,
             "cancelled_reason": e.cancelled_reason,
+            "majors": [m for m in e.majors.split(",") if m],
+            # Saved state for the viewer: "series" (every date), "event" (this date) or None.
+            "saved": "series" if e.series_id in saved_series
+            else "event" if e.id in saved_events
+            else None,
         }
         for e in events
     ]
@@ -89,15 +106,17 @@ def list_events(
     building_ids: list[int] = Query(default=[]),
     room_ids: list[int] = Query(default=[]),
     search: str = "",
-    _: User = Depends(require("event.view")),
+    recommended: bool = False,
+    me: User = Depends(require("event.view")),
     session: Session = Depends(get_session),
 ):
-    """Used by Home, Calendar and (Milestone 3) Map — one shared filter."""
+    """Used by Home, Calendar and Map — one shared filter."""
     f = EventFilter(
         types=types, start=start, end=end, happening_now=happening_now,
         building_ids=building_ids, room_ids=room_ids, search=search,
+        recommended_for=(me.major or "") if recommended else None,
     )  # fmt: skip
-    return events_out(session, svc.list_events(session, f))
+    return events_out(session, svc.list_events(session, f), me)
 
 
 @router.post("/events", status_code=201)
@@ -107,7 +126,7 @@ def create_event(
     session: Session = Depends(get_session),
 ):
     def run():
-        return events_out(session, svc.create(session, user, body))
+        return events_out(session, svc.create(session, user, body), user)
 
     return _rule_errors(run)
 
@@ -119,7 +138,9 @@ def update_event(
     user: User = Depends(current_user),
     session: Session = Depends(get_session),
 ):
-    return _rule_errors(lambda: events_out(session, [svc.update(session, user, event_id, body)])[0])
+    return _rule_errors(
+        lambda: events_out(session, [svc.update(session, user, event_id, body)], user)[0]
+    )
 
 
 @router.post("/events/{event_id}/cancel")

@@ -2,8 +2,8 @@
 
     python -m app.seed
 
-Rename "Test building" once we know which building the pins are in. Pin x/y
-(0..1 on WCC_MAP2.png) wait for Milestone 3; shape_ref keeps the pin number.
+All 4 pins sit on TEC on the campus map.
+shape_ref keeps the pin number; map_x/map_y place the pin on the campus map.
 """
 
 from sqlmodel import Session, select
@@ -11,9 +11,15 @@ from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.place import Building, Floor, Room
 
-BUILDING = "Test building"
-# (pin number, room name, floor) from labels "38 f1", "26 f1", "108 f2", "25 d f1".
-PINS = [(1, "38", 1), (6, "26", 1), (2, "108", 2), (3, "25D", 1)]
+BUILDING = "TEC"
+# (pin number, room name, floor, x, y) from labels "38 f1", "26 f1", "108 f2",
+# "25 d f1"; x/y are 0..1 on WCC_MAP2.png.
+PINS = [
+    (1, "38", 1, 0.6805, 0.3227),
+    (6, "26", 1, 0.7484, 0.3111),
+    (2, "108", 2, 0.6941, 0.2281),
+    (3, "25D", 1, 0.746, 0.2371),
+]
 
 
 def seed(session: Session) -> int:
@@ -23,7 +29,7 @@ def seed(session: Session) -> int:
         session.add(building)
         session.flush()
     added = 0
-    for pin, name, level in PINS:
+    for pin, name, level, x, y in PINS:
         floor = session.exec(
             select(Floor).where(Floor.building_id == building.id, Floor.level == level)
         ).first()
@@ -31,9 +37,12 @@ def seed(session: Session) -> int:
             floor = Floor(building_id=building.id, level=level)
             session.add(floor)
             session.flush()
-        if session.exec(select(Room).where(Room.shape_ref == f"pin:{pin}")).first() is None:
-            session.add(Room(floor_id=floor.id, name=name, shape_ref=f"pin:{pin}"))
+        room = session.exec(select(Room).where(Room.shape_ref == f"pin:{pin}")).first()
+        if room is None:
+            room = Room(floor_id=floor.id, name=name, shape_ref=f"pin:{pin}")
             added += 1
+        room.map_x, room.map_y = x, y
+        session.add(room)
     session.commit()
     return added
 

@@ -29,6 +29,7 @@ class User(SQLModel, table=True):
     display_name: str = Field(default="", max_length=200)
     role: str = Field(default=Role.STUDENT.value, max_length=20)  # a Role value; plain string so adding a role needs no DB enum migration
     is_banned: bool = False
+    major: str | None = Field(default=None, max_length=40)  # a key from core/majors.py
     last_active_at: datetime = Field(default_factory=utcnow)
     created_at: datetime = Field(default_factory=utcnow)
 
