@@ -48,6 +48,10 @@ def _resolve_sqlite(url: str) -> str:
 
 _load_dotenv(REPO_ROOT / ".env")
 
+# Westchester Community College's Microsoft tenant (architecture §8). The
+# default, so a missing env var can never lock every student out.
+WCC_TENANT_ID = "4981a704-f6a3-4ac0-89c2-a3812354a3ff"
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -58,7 +62,9 @@ class Settings:
         "MS_REDIRECT_URI", "http://localhost:8000/auth/microsoft/callback"
     )
     allowed_tenant_ids: tuple[str, ...] = tuple(
-        t.strip() for t in os.getenv("ALLOWED_TENANT_IDS", "").split(",") if t.strip()
+        t.strip()
+        for t in os.getenv("ALLOWED_TENANT_IDS", WCC_TENANT_ID).split(",")
+        if t.strip()
     )
     email_domain_requirement: str = os.getenv("EMAIL_DOMAIN_REQUIREMENT", "sunywcc.edu")
     owner_email: str = os.getenv("OWNER_EMAIL", "")
