@@ -1,6 +1,6 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost, setCsrfToken } from '../api';
+import { apiGet, apiPost, setCsrfToken, setOnUnauthorized } from '../api';
 
 // Current user + their permission list, from GET /auth/me. The frontend uses
 // permissions only to show or hide buttons; the server enforces everything.
@@ -21,6 +21,10 @@ export function AuthProvider({ children }) {
   const qc = useQueryClient();
   const { data, isPending } = useQuery({ queryKey: ['me'], queryFn: fetchMe, retry: false });
   const me = data ?? null;
+  useEffect(() => {
+    setOnUnauthorized(() => qc.invalidateQueries({ queryKey: ['me'] }));
+    return () => setOnUnauthorized(null);
+  }, [qc]);
   const value = {
     loading: isPending,
     user: me?.user ?? null,

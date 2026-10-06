@@ -89,6 +89,35 @@ describe('Sign out', () => {
   });
 });
 
+describe('Session ends while the app is open', () => {
+  it('drops to the sign-in page when the API says 401', async () => {
+    let signedIn = true;
+    vi.stubGlobal('fetch', vi.fn(async (url) => {
+      if (url.endsWith('/auth/me')) {
+        return signedIn ? new Response(JSON.stringify(ME), { status: 200 })
+          : new Response(JSON.stringify({ detail: 'Not signed in' }), { status: 401 });
+      }
+      if (url.includes('/events')) {
+        return signedIn ? new Response('[]', { status: 200 })
+          : new Response(JSON.stringify({ detail: 'Not signed in' }), { status: 401 });
+      }
+      return new Response(JSON.stringify({ status: 'ok', unread: 0 }), { status: 200 });
+    }));
+    const loc = memoryLocation({ path: '/home', record: true });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <Router hook={loc.hook}><AuthProvider><App /></AuthProvider></Router>
+      </QueryClientProvider>
+    );
+    expect(await screen.findByRole('heading', { name: "What's on" })).toBeTruthy();
+    signedIn = false; // e.g. the account was deleted or banned
+    fireEvent.click(screen.getByRole('button', { name: 'Now' })); // any request
+    expect(await screen.findByText('Sign in with Microsoft')).toBeTruthy();
+    await waitFor(() => expect(loc.history.at(-1)).toBe('/'));
+  });
+});
+
 describe('App shell (signed out)', () => {
   it('sends signed-out users to the sign-in page, with no tab bar', async () => {
     const loc = renderAt('/map', null);

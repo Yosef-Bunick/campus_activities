@@ -7,6 +7,12 @@ const FETCH_TIMEOUT = 15000;
 let csrfToken = '';
 export function setCsrfToken(token) { csrfToken = token || ''; }
 
+// Called when any request answers 401 (session expired, revoked, banned, or
+// the account was deleted), so the app re-checks /auth/me and drops to the
+// sign-in page instead of looking signed in while every action fails.
+let onUnauthorized = null;
+export function setOnUnauthorized(fn) { onUnauthorized = fn; }
+
 async function request(method, path, body) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -15,6 +21,7 @@ async function request(method, path, body) {
   if (body !== undefined) init.body = JSON.stringify(body);
   const res = await fetch(`${API_BASE}${path}`, init);
   const data = await res.json().catch(() => null);
+  if (res.status === 401 && path !== '/auth/me') onUnauthorized?.();
   if (!res.ok) {
     const err = new Error(data?.detail || `HTTP ${res.status}`);
     err.status = res.status;
