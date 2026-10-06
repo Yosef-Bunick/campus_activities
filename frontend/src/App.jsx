@@ -5,6 +5,8 @@ import { Redirect, Route, Switch, useLocation } from 'wouter';
 import { ROUTES } from './app/routes';
 import TopBar from './components/TopBar';
 import BottomTabs, { TAB_BAR_HEIGHT } from './components/BottomTabs';
+import { useAuth } from './contexts/AuthContext';
+import { FilterProvider } from './contexts/FilterContext';
 
 function Loading() {
   return (
@@ -16,9 +18,14 @@ function Loading() {
 
 export default function App() {
   const [location] = useLocation();
-  const signedInArea = location !== '/';
+  const { user, loading } = useAuth();
+  if (loading) return <Loading />;
+  // Signed-out people only get the sign-in page; signed-in people skip it.
+  if (!user && location !== '/') return <Redirect to="/" replace />;
+  if (user && location === '/') return <Redirect to="/home" replace />;
+  const signedInArea = Boolean(user);
   return (
-    <>
+    <FilterProvider>
       <TopBar showProfile={signedInArea} />
       <Box
         component="main"
@@ -39,6 +46,6 @@ export default function App() {
         </Suspense>
       </Box>
       {signedInArea && <BottomTabs />}
-    </>
+    </FilterProvider>
   );
 }

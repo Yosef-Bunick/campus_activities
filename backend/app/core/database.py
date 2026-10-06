@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
+from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, create_engine
 
 from app.core.config import settings
@@ -15,7 +16,11 @@ from app.core.config import settings
 _connect_args = (
     {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
 )
-engine = create_engine(settings.database_url, connect_args=_connect_args, pool_pre_ping=True)
+# "sqlite://" (tests) is in-memory: every connection must share the one database.
+_pool = {"poolclass": StaticPool} if settings.database_url == "sqlite://" else {}
+engine = create_engine(
+    settings.database_url, connect_args=_connect_args, pool_pre_ping=True, **_pool
+)
 
 
 def get_session() -> Iterator[Session]:

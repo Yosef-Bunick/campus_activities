@@ -8,11 +8,13 @@ import MenuItem from '@mui/material/MenuItem';
 import AccountIcon from '@mui/icons-material/esm/AccountCircleOutlined';
 import { useLocation } from 'wouter';
 import ApiStatus from './ApiStatus';
+import { useAuth } from '../contexts/AuthContext';
 
 // Top bar with the profile menu. /hidden lives here, not in the tab bar (architecture §3).
 export default function TopBar({ showProfile }) {
   const [, navigate] = useLocation();
   const [anchor, setAnchor] = useState(null);
+  const { user, signOut } = useAuth();
   const go = (path) => { setAnchor(null); navigate(path); };
   return (
     <AppBar position="sticky" elevation={0} sx={{ pt: 'env(safe-area-inset-top)' }}>
@@ -27,7 +29,9 @@ export default function TopBar({ showProfile }) {
               <AccountIcon />
             </IconButton>
             <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
+              {user && <MenuItem disabled>{user.display_name || user.email}</MenuItem>}
               <MenuItem onClick={() => go('/hidden')}>Hidden</MenuItem>
+              <MenuItem onClick={async () => { setAnchor(null); await signOut(); navigate('/'); }}>Sign out</MenuItem>
             </Menu>
           </>
         )}

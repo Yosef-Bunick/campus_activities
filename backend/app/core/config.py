@@ -62,6 +62,13 @@ class Settings:
     inactivity_delete_days: int = int(os.getenv("INACTIVITY_DELETE_DAYS", "150"))
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
     sentry_dsn: str = os.getenv("SENTRY_DSN", "")
+    # Local-only "sign in as" for testing before/without Microsoft (ADR-023).
+    dev_login_flag: bool = os.getenv("DEV_LOGIN", "") == "1"
+
+    @property
+    def dev_login(self) -> bool:
+        """Never on an HTTPS (deployed) frontend, whatever the flag says."""
+        return self.dev_login_flag and self.frontend_origin.startswith("http://localhost")
 
 
 settings = Settings()

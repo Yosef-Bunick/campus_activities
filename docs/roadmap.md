@@ -23,38 +23,43 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 - [x] `.env.example`, `.gitignore`, `robots.txt` (disallow all)
 - [x] Local dev without Docker (SQLite + `uvicorn` + `npm run dev`)
 - [x] CI: pytest + ruff, Vitest + lint, and a **JS size budget** (~150 KB gzipped on first load). First-load JS is 124 KB today
-- [ ] Push to GitHub and see both workflows go green (needs a GitHub repo)
+- [x] Push to GitHub and see both workflows go green ([Yosef-Bunick/campus_activities](https://github.com/Yosef-Bunick/campus_activities), 2026-10-06)
 - [ ] Add to the home screen on a real phone (needs HTTPS, so this happens with the first deploy)
 
 **Done when:** the app opens on a phone, can be added to the home screen, every tab loads its own chunk, and CI is green.
 
-## Milestone 1: Sign-in and roles ⬜
-- [ ] **First step:** register the app in Microsoft Entra and test with a real `@my.sunywcc.edu` account. If you see "Need admin approval", contact WCC IT. If IT blocks it, switch to Plan B (architecture §8)
-- [ ] "Sign in with Microsoft", a single button (OIDC via `authlib`, unified's Google sign-in pattern)
-- [ ] Gate: WCC tenant **and** `sunywcc.edu` / `*.sunywcc.edu`; `OWNER_EMAIL` is exempt and becomes owner
-- [ ] Revocable sessions (httpOnly cookie + CSRF), copied from unified
-- [ ] Roles + **`backend/app/core/permissions.py`**: permissions **and** scheduling limits in one file
-- [ ] `/auth/me` returns role, permissions, and limits
-- [ ] Person sheet (tap a name): Favorite · Hide, plus Ban · Change role for managers/owner, following the hierarchy rule
-- [ ] Ban revokes sessions, blocks the account through the banned hash, and cancels upcoming events
-- [ ] `last_active_at` tracking
+## Milestone 1: Sign-in and roles 🟨
+- [ ] **First step:** register the app in Microsoft Entra and test with a real `@my.sunywcc.edu` account. If you see "Need admin approval", contact WCC IT. If IT blocks it, switch to Plan B (architecture §8). *Waiting on the Entra keys; everything below that doesn't need Microsoft was built first (2026-10-06)*
+- [x] Local developer sign-in for testing without Microsoft (`DEV_LOGIN=1`, localhost only; ADR-023)
+- [ ] "Sign in with Microsoft", a single button (OIDC via `authlib`, unified's Google sign-in pattern): `/auth/microsoft/login` + `/callback` that validate the ID token and call `services/accounts.sign_in()`; enable the button
+- [x] Gate: WCC tenant **and** `sunywcc.edu` / `*.sunywcc.edu`; `OWNER_EMAIL` is exempt and becomes owner (`services/accounts.py`, tested with fake identities)
+- [x] Revocable sessions (httpOnly cookie + CSRF), copied from unified (ADR-018, ADR-019)
+- [x] Roles + **`backend/app/core/permissions.py`**: permissions **and** scheduling limits in one file
+- [x] `/auth/me` returns role, permissions, and limits; `AuthContext.jsx`; signed-out people only reach `/`, signed-in people skip it
+- [x] Person sheet (tap a name): Favorite · Hide, plus Ban · Change role for managers/owner, following the hierarchy rule. *Favorite/Hide buttons are shown but disabled until Milestone 4 stores them; the sheet gets opened from names once events exist (Milestone 2)*
+- [x] Ban revokes sessions and blocks the account through the banned hash. *Cancelling upcoming events moves to Milestone 2*
+- [x] `last_active_at` tracking (at most once an hour)
 
 **Done when:** WCC accounts can sign in, everyone else is rejected (except the owner), and editing `permissions.py` changes what people can do.
 
-## Milestone 2: Events, Home and Calendar ⬜
-- [ ] Create, edit, and cancel events. Each event has **exactly one type**: `main_event`, `club_event`, or `friend_event`
-- [ ] Rules enforced on the server (architecture §6):
-  - [ ] schedule at most **3 months ahead** (students/security) or **1 year** (SGA, manager, owner)
-  - [ ] students/security can't have **two of their own events at the same time**
-  - [ ] **room limit:** max 2 overlapping events per room, and a 3rd is **blocked** for now
-  - [ ] daily creation cap (anti-spam)
-- [ ] **Recurring events:** daily / weekly on chosen days / every 2 weeks, within the schedule-ahead limit. Conflicting dates are listed and can be skipped
-- [ ] **Cancel buttons:** "Cancel event" (this date) and "Cancel recurring" with a choice of *only this date / this and future / whole series*
-- [ ] Cancelled events stay visible, crossed out, until they end. The creator gets a notice in `/alerts`
-- [ ] **`/home`**: happening now + next few hours, plus a **+ New event** button
-- [ ] **`/calendar`**: day / week / list
-- [ ] **Shared filter** (bottom sheet on phones), synced to the URL and shared by Calendar and Map
-- [ ] Times stored in UTC and shown in New York time
+## Milestone 2: Events, Home and Calendar 🟨
+- [x] Create, edit, and cancel events. Each event has **exactly one type**: `main_event`, `club_event`, or `friend_event`
+- [x] Rules enforced on the server (architecture §6), all limits from `permissions.py`:
+  - [x] schedule at most **3 months ahead** (students/security) or **1 year** (SGA, manager, owner)
+  - [x] students/security can't have **two of their own events at the same time**
+  - [x] **room limit:** max 2 overlapping events per room, and a 3rd is **blocked** for now
+  - [x] daily creation cap (anti-spam): one-offs + series created in the last 24 hours (ADR-024)
+- [x] **Recurring events:** daily / weekly on chosen days / every 2 weeks, within the schedule-ahead limit. Conflicting dates are listed and can be skipped
+- [x] **Cancel buttons:** "Cancel event" (this date) and "Cancel recurring" with a choice of *only this date / this and future / whole series*
+- [x] Cancelled events stay visible, crossed out, until they end. The creator gets a notice in `/alerts` (stored now; the page is Milestone 4)
+- [x] Banning someone cancels their upcoming events
+- [x] Tapping a creator's name opens the person sheet
+- [x] Rooms: the 4 test rooms from `pin-map.html` (38, 26, 25D on floor 1; 108 on floor 2) in a placeholder "Test building", seeded by `python -m app.seed`
+- [x] **`/home`**: happening now + next 4 hours, plus a **+ New event** button
+- [x] **`/calendar`**: day / week / list
+- [x] **Shared filter** (bottom sheet on phones), synced to the URL and shared by Calendar and Map
+- [x] Times stored in UTC and shown in New York time (`tzdata` on the server, the browser's `Intl` on phones; ADR-021)
+- [ ] You try it on your phone-size screen and say it feels right
 
 **Done when:** a student can post "studying in 204, 3 to 5pm, every Tuesday" from their phone, and everyone sees it.
 
@@ -69,10 +74,12 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 ## Milestone 4: Favorites, Hidden, Alerts ⬜
 - [ ] **`/favorites`**: events from people you favorited
 - [ ] **`/hidden`**: people and events/series you've hidden, with Unhide
+- [ ] Turn on the person sheet's Favorite / Hide buttons (`UserFavorite`, `UserHidden`)
 - [ ] **`/alerts`**: "your event was cancelled" notices, with a read/unread state
 - [ ] Deploy (Vercel frontend + Render API + **Neon** database), turn on Sentry, and **pilot with a small group**
   - [ ] `render.yaml` (API only) + Postgres driver (`psycopg2-binary`, as unified) in `requirements.txt`; run `alembic upgrade head` on start
   - [ ] Set `VITE_API_BASE` in Vercel; add the Vercel URL to `FRONTEND_ORIGIN`
+  - [ ] Make the session cookie first-party: iPhone Safari blocks cookies from a different site, so `*.vercel.app` → `*.onrender.com` won't keep anyone signed in. Needs the domain decision (`app.` + `api.` on one domain, or a Vercel `/api` rewrite)
   - [ ] Real app icons and name in the PWA manifest
   - [ ] Playwright smoke test at phone size (`frontend/e2e/`)
 
@@ -94,6 +101,7 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 ---
 
 # Later (not scheduled)
+- **Proposed (needs your OK):** a more "calendar" Home: **Recommended** events, **Saved** events (★ an event, new `SavedEvent` table), and time chips (Now · Next 4h · Today · This week)
 - **Native iPhone + Android apps**, by wrapping the same React build with Capacitor
 - **Push notifications** (PWA push works on Android, and on iPhone once added to the home screen)
 - **Immersive map:** full campus video / 360° / 3D linked to the same rooms

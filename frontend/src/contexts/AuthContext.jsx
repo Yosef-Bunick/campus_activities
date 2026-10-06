@@ -1,0 +1,44 @@
+import { createContext, useContext } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost, setCsrfToken } from '../api';
+
+// Current user + their permission list, from GET /auth/me. The frontend uses
+// permissions only to show or hide buttons; the server enforces everything.
+const AuthContext = createContext(null);
+
+async function fetchMe() {
+  try {
+    const me = await apiGet('/auth/me');
+    setCsrfToken(me.csrf_token);
+    return me;
+  } catch (err) {
+    if (err.status === 401) return null; // signed out is a normal state, not an error
+    throw err;
+  }
+}
+
+export function AuthProvider({ children }) {
+  const qc = useQueryClient();
+  const { data, isPending } = useQuery({ queryKey: ['me'], queryFn: fetchMe, retry: false });
+  const me = data ?? null;
+  const value = {
+    loading: isPending,
+    user: me?.user ?? null,
+    permissions: me?.permissions ?? [],
+    limits: me?.limits ?? null,
+    can: (perm) => Boolean(me?.permissions.includes(perm)),
+    signOut: async () => {
+      await apiPost('/auth/logout').catch(() => {});
+      setCsrfToken('');
+      // Not qc.clear(): that drops the 'me' query this provider is subscribed
+      // to, so the app would never see the sign-out. Null it, drop the rest.
+      qc.setQueryData(['me'], null);
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
+    },
+  };
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
+}

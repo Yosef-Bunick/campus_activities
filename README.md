@@ -55,7 +55,7 @@ backend/         FastAPI: routers, services, models, permissions.py, tests
 render.yaml      deployment
 ```
 
-Milestone 0 (foundation) is in place: an empty-but-working backend and a PWA shell with placeholder pages.
+Milestones 0–2 are built: foundation, roles and sessions, and events (Home, Calendar, shared filter). The Microsoft login waits on the Entra app registration; until then use the local developer sign-in.
 
 ## Getting started
 
@@ -72,6 +72,7 @@ cd backend
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt      # macOS/Linux: .venv/bin/pip
 .venv/Scripts/python -m alembic upgrade head       # creates backend/dev.db (SQLite)
+.venv/Scripts/python -m app.seed                   # the 4 test rooms
 .venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 ```
 
@@ -83,7 +84,11 @@ npm install
 npm run dev
 ```
 
-The top bar shows **API ok** when the frontend can reach the backend. The frontend reads `VITE_API_BASE` (default `http://localhost:8000`); see `frontend/.env.example`.
+The top bar shows **API ok** when the frontend can reach the backend. Signed-out visitors only see the sign-in page; the **Sign in with Microsoft** button turns on once `MS_CLIENT_ID` / `MS_CLIENT_SECRET` / `OWNER_EMAIL` are in `.env` and the Microsoft login route lands. Roles and limits: edit `backend/app/core/permissions.py`.
+
+**Testing without Microsoft:** set `DEV_LOGIN=1` in `.env` (localhost only). The sign-in page then shows a "Local testing only" form: type a school email, pick a role, sign in. No passwords.
+
+**Schema changes before launch:** there is one migration (ADR-022). After changing a model, delete `backend/migrations/versions/0001_initial_schema.py` and `backend/dev.db`, then run `alembic revision --autogenerate -m "initial schema" --rev-id 0001`, `alembic upgrade head`, and `python -m app.seed`. The frontend reads `VITE_API_BASE` (default `http://localhost:8000`); see `frontend/.env.example`.
 
 In the Claude desktop app, `.claude/launch.json` has `api`, `web`, and `web-prod` (a production build preview, where the PWA/service worker is active; run `npm run build` first).
 
