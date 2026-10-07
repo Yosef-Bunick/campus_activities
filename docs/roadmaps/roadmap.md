@@ -121,6 +121,8 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 - [x] Share an event (phone share sheet or copy link); shared links open on Calendar, even after signing in
 - [x] `python -m app.seed --demo`: demo people + current events for local testing
 - [x] RSVPs: "Going" toggle with a live count on every event (ADR-035)
+- [x] RSVP cancellations alert everyone going; Favorites shows Going, Saved, From people you follow, Your events
+- [x] Pull-to-refresh on Home and Calendar
 - [ ] iPhone splash screens (once the final icon/name are chosen)
 
 # Later (not scheduled)

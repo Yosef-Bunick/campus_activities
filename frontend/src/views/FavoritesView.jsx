@@ -8,7 +8,8 @@ import EventList from '../components/EventList';
 
 const PersonSheet = lazy(() => import('../components/PersonSheet'));
 
-// ★ Saved events (one date or a whole series) + everything from people you ♥ favorite.
+// Going (your RSVPs), ★ Saved (one date or a whole series), everything from
+// people you ♥ favorite, and the events you posted.
 export default function FavoritesView() {
   const query = useQuery({ queryKey: ['favorites'], queryFn: () => apiGet('/favorites'), refetchInterval: 60000 });
   const [person, setPerson] = useState(null);
@@ -16,7 +17,10 @@ export default function FavoritesView() {
 
   return (
     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Typography variant="h5" component="h1">Saved</Typography>
+      <Typography variant="h5" component="h1">Going</Typography>
+      <EventList query={part('going')} empty="Tap Going on an event and it shows up here." />
+
+      <Typography variant="h5" component="h1" sx={{ mt: 2 }}>Saved</Typography>
       <EventList query={part('saved')} empty="Tap ☆ on any event to save it here." />
 
       <Typography variant="h5" component="h1" sx={{ mt: 2 }}>From people you follow</Typography>
@@ -28,6 +32,9 @@ export default function FavoritesView() {
         </Box>
       )}
       <EventList query={part('from_people')} empty="Tap a person's name on an event, then Favorite, to see all their events here." />
+
+      <Typography variant="h5" component="h1" sx={{ mt: 2 }}>Your events</Typography>
+      <EventList query={part('mine')} empty="Events you post show up here." />
       <Suspense fallback={null}>
         {person && <PersonSheet userId={person} open onClose={() => setPerson(null)} />}
       </Suspense>

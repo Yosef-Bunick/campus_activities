@@ -88,11 +88,16 @@ describe('favorites', () => {
     const unsave = vi.fn();
     api({
       '/auth/me': { user: { id: 1 }, permissions: [], limits: {}, csrf_token: 't' },
-      '/favorites': { saved: [{ ...EVENT, saved: 'event' }], from_people: [], people: [{ id: 2, display_name: 'Ana' }] },
+      '/favorites': {
+        going: [{ ...EVENT, id: 10, title: 'Pickup game', going: true, going_count: 3 }],
+        saved: [{ ...EVENT, saved: 'event' }], from_people: [], people: [{ id: 2, display_name: 'Ana' }], mine: [],
+      },
       '/events/9/unsave': () => { unsave(); return { ok: true }; },
     });
     renderPage(FavoritesView);
     expect(await screen.findByText('Study, group')).toBeTruthy();
+    expect(screen.getByText('Pickup game')).toBeTruthy(); // the Going section
+    expect(screen.getByText('Events you post show up here.')).toBeTruthy();
     expect(screen.getByText('Ana')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Unsave' }));
     await waitFor(() => expect(unsave).toHaveBeenCalled());
