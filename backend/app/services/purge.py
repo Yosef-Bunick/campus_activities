@@ -3,7 +3,7 @@
 Used by the daily 150-day inactivity purge and by "Delete my account". Done
 with explicit statements (not relying on database cascades) so it behaves the
 same on SQLite and Postgres:
-  * deleted: the user, their sessions, events + series, favorites/hides/saves in
+  * deleted: the user, their sessions, events + series, favorites/hides/saves/RSVPs in
     BOTH directions, alerts, reports they made, rule hits;
   * kept: moderation-log text (ids go null → "a deleted user") and the ban hash
     in banned_accounts, so a ban outlives the account.
@@ -20,7 +20,7 @@ from app.core.config import settings
 from app.core.permissions import Role
 from app.models.event import Alert, Event, EventSeries
 from app.models.moderation import ModerationLog, Report, RuleHit
-from app.models.social import HiddenEvent, SavedEvent, UserFavorite, UserHidden
+from app.models.social import HiddenEvent, Rsvp, SavedEvent, UserFavorite, UserHidden
 from app.models.user import AuthSession, User
 
 
@@ -33,6 +33,7 @@ def delete_user(session: Session, user: User) -> None:
     if event_ids:
         session.exec(delete(SavedEvent).where(col(SavedEvent.event_id).in_(event_ids)))
         session.exec(delete(HiddenEvent).where(col(HiddenEvent.event_id).in_(event_ids)))
+        session.exec(delete(Rsvp).where(col(Rsvp.event_id).in_(event_ids)))
         session.exec(delete(Report).where(col(Report.event_id).in_(event_ids)))
         session.exec(update(Alert).where(col(Alert.event_id).in_(event_ids)).values(event_id=None))
         session.exec(
@@ -48,6 +49,7 @@ def delete_user(session: Session, user: User) -> None:
     for stmt in (
         delete(SavedEvent).where(SavedEvent.user_id == uid),
         delete(HiddenEvent).where(HiddenEvent.user_id == uid),
+        delete(Rsvp).where(Rsvp.user_id == uid),
         delete(UserFavorite).where(or_(UserFavorite.user_id == uid, UserFavorite.favorite_user_id == uid)),
         delete(UserHidden).where(or_(UserHidden.user_id == uid, UserHidden.hidden_user_id == uid)),
         delete(Alert).where(Alert.user_id == uid),

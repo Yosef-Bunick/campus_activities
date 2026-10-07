@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Skeleton from '@mui/material/Skeleton';
 import EventSkeleton from './components/EventSkeleton';
@@ -23,12 +23,32 @@ function Loading() {
   );
 }
 
+// A link opened while signed out (e.g. a shared event) is remembered through
+// sign-in, including the Microsoft round trip (ADR-034).
+const AFTER_SIGNIN = 'after-signin';
+const remember = (path) => { try { sessionStorage.setItem(AFTER_SIGNIN, path); } catch { /* private mode */ } };
+function takeRemembered() {
+  try {
+    const path = sessionStorage.getItem(AFTER_SIGNIN);
+    sessionStorage.removeItem(AFTER_SIGNIN);
+    return path;
+  } catch { return null; }
+}
+
 export default function App() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { user, loading, terms, needsMajor } = useAuth();
+  useEffect(() => {
+    if (!user) return;
+    const back = takeRemembered();
+    if (back) navigate(back, { replace: true });
+  }, [user, navigate]);
   if (loading) return <Loading />;
   // Signed-out people only get the sign-in page; signed-in people skip it.
-  if (!user && location !== '/') return <Redirect to="/" replace />;
+  if (!user && location !== '/') {
+    remember(location + window.location.search);
+    return <Redirect to="/" replace />;
+  }
   if (user && location === '/') return <Redirect to="/home" replace />;
   const signedInArea = Boolean(user);
   return (

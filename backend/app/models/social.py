@@ -53,3 +53,11 @@ class HiddenEvent(SQLModel, table=True):
     event_id: int | None = Field(default=None, foreign_key="event.id", ondelete="CASCADE")
     series_id: int | None = Field(default=None, foreign_key="eventseries.id", ondelete="CASCADE")
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class Rsvp(SQLModel, table=True):
+    """"I'm going" to one event (ADR-035); the feed shows a live count."""
+
+    user_id: int = Field(foreign_key="user.id", primary_key=True, ondelete="CASCADE")
+    event_id: int = Field(foreign_key="event.id", primary_key=True, index=True, ondelete="CASCADE")
+    created_at: datetime = Field(default_factory=utcnow)

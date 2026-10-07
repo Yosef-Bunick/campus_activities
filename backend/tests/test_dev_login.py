@@ -50,3 +50,19 @@ def test_logout_from_the_app_origin_works_without_a_token(db):
     del c.headers["X-CSRF-Token"]
     assert c.post("/auth/logout", headers={"Origin": "http://localhost:5173"}).status_code == 200
     assert c.get("/auth/me").status_code == 401
+
+
+def test_dev_login_keeps_an_existing_name(db, enabled):
+    from sqlmodel import select
+
+    from app.models.user import User
+
+    c = client_for(db)
+    c.post("/auth/dev-login", json={"email": "ana@my.sunywcc.edu"})
+    user = db.exec(select(User).where(User.email == "ana@my.sunywcc.edu")).one()
+    user.display_name = "Ana Student"
+    db.add(user)
+    db.commit()
+    client_for(db).post("/auth/dev-login", json={"email": "ana@my.sunywcc.edu"})
+    db.refresh(user)
+    assert user.display_name == "Ana Student"

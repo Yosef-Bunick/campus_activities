@@ -70,6 +70,24 @@ def _saved_by(session: Session, viewer: User | None) -> tuple[set[int], set[int]
     return {e for e, _ in rows if e}, {s for _, s in rows if s}
 
 
+def _going(session: Session, events: list[Event], viewer: User | None) -> tuple[dict[int, int], set[int]]:
+    """RSVP counts per event (one grouped query) and the viewer's own (one more)."""
+    from sqlalchemy import func
+
+    from app.models.social import Rsvp
+
+    ids = [e.id for e in events]
+    counts = dict(
+        session.exec(
+            select(Rsvp.event_id, func.count()).where(col(Rsvp.event_id).in_(ids)).group_by(Rsvp.event_id)
+        ).all()
+    )
+    mine = set(
+        session.exec(select(Rsvp.event_id).where(Rsvp.user_id == viewer.id, col(Rsvp.event_id).in_(ids))).all()
+    ) if viewer is not None else set()  # fmt: skip
+    return counts, mine
+
+
 def events_out(session: Session, events: list[Event], viewer: User | None = None) -> list[dict]:
     # A fixed number of queries per call (no N+1), each limited to what these
     # events refer to, so a long feed costs the same round trips as a short one.
@@ -78,6 +96,7 @@ def events_out(session: Session, events: list[Event], viewer: User | None = None
     room_ids = {e.room_id for e in events if e.room_id}
     rooms = rooms_out(session, room_ids) if room_ids else {}
     saved_events, saved_series = _saved_by(session, viewer)
+    going_count, going = _going(session, events, viewer)
     sids = {e.series_id for e in events if e.series_id}
     series_end = dict(
         session.exec(select(EventSeries.id, EventSeries.ends_on).where(col(EventSeries.id).in_(sids))).all()
@@ -108,6 +127,8 @@ def events_out(session: Session, events: list[Event], viewer: User | None = None
             "saved": "series" if e.series_id in saved_series
             else "event" if e.id in saved_events
             else None,
+            "going_count": going_count.get(e.id, 0),
+            "going": e.id in going,
         }
         for e in events
     ]
@@ -140,6 +161,19 @@ def list_events(
         viewer_id=me.id,
     )  # fmt: skip
     return events_out(session, svc.list_events(session, f), me)
+
+
+@router.get("/events/{event_id}")
+def get_event(
+    event_id: int, me: User = Depends(require("event.view")), session: Session = Depends(get_session)
+):
+    """One event, for shared links (ADR-034). Pending/rejected events are only
+    visible to their creator, the same rule as the feeds."""
+    ev = session.get(Event, event_id)
+    public = ev is not None and ev.status in ("active", "cancelled")
+    if ev is None or not (public or ev.creator_id == me.id):
+        raise HTTPException(404, "No such event")
+    return events_out(session, [ev], me)[0]
 
 
 @router.post("/events", status_code=201)

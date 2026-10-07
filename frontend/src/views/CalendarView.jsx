@@ -9,6 +9,10 @@ import Typography from '@mui/material/Typography';
 import PrevIcon from '@mui/icons-material/esm/ChevronLeft';
 import NextIcon from '@mui/icons-material/esm/ChevronRight';
 import FilterIcon from '@mui/icons-material/esm/FilterList';
+import { useQuery } from '@tanstack/react-query';
+import { useLocation, useSearch } from 'wouter';
+import { apiGet } from '../api';
+import EventCard from '../components/EventCard';
 import EventList from '../components/EventList';
 import { toApiParams, useFilter } from '../contexts/FilterContext';
 import { useEvents } from '../hooks/useEvents';
@@ -23,6 +27,13 @@ export default function CalendarView() {
   const [view, setView] = useState('day');
   const [day, setDay] = useState(nyDateKey());
   const [filterOpen, setFilterOpen] = useState(false);
+  // A shared link (/calendar?event=123) shows that event on top (ADR-034).
+  const [, navigate] = useLocation();
+  const sharedId = new URLSearchParams(useSearch()).get('event');
+  const shared = useQuery({
+    queryKey: ['event', sharedId], queryFn: () => apiGet(`/events/${sharedId}`),
+    enabled: Boolean(sharedId), retry: false,
+  });
 
   const first = view === 'week' ? addDays(day, -weekday(day)) : day; // weeks start Monday
   const last = addDays(first, SPAN[view]);
@@ -44,6 +55,16 @@ export default function CalendarView() {
           <Button size="small" startIcon={<FilterIcon />} onClick={() => setFilterOpen(true)}>Filter</Button>
         </Badge>
       </Box>
+      {sharedId && (
+        <Box component="section" aria-label="Shared with you" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography variant="overline" color="text.secondary" sx={{ flexGrow: 1 }}>Shared with you</Typography>
+            <Button size="small" onClick={() => navigate('/calendar', { replace: true })}>Close</Button>
+          </Box>
+          {shared.data && <EventCard event={shared.data} showDate />}
+          {shared.error && <Typography color="text.secondary" variant="body2">That event isn't available any more.</Typography>}
+        </Box>
+      )}
       <ToggleButtonGroup exclusive size="small" value={view} onChange={(_, v) => v && setView(v)} fullWidth>
         <ToggleButton value="day">Day</ToggleButton>
         <ToggleButton value="week">Week</ToggleButton>

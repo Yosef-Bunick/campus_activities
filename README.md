@@ -73,6 +73,7 @@ python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt      # macOS/Linux: .venv/bin/pip
 .venv/Scripts/python -m alembic upgrade head       # creates backend/dev.db (SQLite)
 .venv/Scripts/python -m app.seed                   # the 4 test rooms
+.venv/Scripts/python -m app.seed --demo            # optional: + demo people/events (prints dev sign-in emails)
 .venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 ```
 
@@ -110,6 +111,18 @@ In the Claude desktop app, `.claude/launch.json` has `api`, `web`, and `web-prod
 ### Changing the app name or icon
 
 Both live in `frontend/brand/` (details in [frontend/brand/README.md](frontend/brand/README.md)). **Name:** edit `brand.json`; the top bar, sign-in page, browser tab, iOS title and PWA manifest all read it. **Icon:** replace `brand/icon.png` (square, ideally 1024 px), then run `python scripts/make-icons.py` from `frontend/` to regenerate every icon size and the favicon.
+
+## Installing it on a phone or laptop
+
+It's one web app (a PWA) for every device. Once it's online over HTTPS:
+
+| Device | How to install |
+|---|---|
+| **iPhone / iPad** (Safari) | Share button → **Add to Home Screen**. The app shows this hint itself the first time. |
+| **Android** (Chrome) and **Samsung** (Samsung Internet) | Tap **Install** in the app's hint, or the browser menu → **Install app** / **Add to Home screen**. |
+| **Laptop** (Chrome, Edge) | The install icon in the address bar, or the app's **Install** hint. Safari and Firefox just use it as a website. |
+
+Installed, it opens full screen with its own icon, follows the device's light/dark setting, and keeps the last events it loaded for when there's no signal.
 
 ## License
 

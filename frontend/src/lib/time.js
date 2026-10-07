@@ -57,3 +57,40 @@ export function groupByDay(events) {
   }
   return [...groups.entries()];
 }
+
+// ── Live "Now · ends in 40 min" / "In 25 min" labels (ADR-034) ──
+
+function span(ms) {
+  const min = Math.max(1, Math.round(ms / 60000));
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+/** Short, live label for an event, or null when the date/time already says enough. */
+export function relativeLabel(event, now = Date.now()) {
+  const start = new Date(event.starts_at).getTime();
+  const end = new Date(event.ends_at).getTime();
+  if (end <= now) return null;
+  if (start <= now) return `Now · ends in ${span(end - now)}`;
+  if (start - now <= 12 * 3600000) return `In ${span(start - now)}`;
+  return null;
+}
+
+// One shared minute ticker for every card (not one timer per card).
+const listeners = new Set();
+let timer = null;
+let minuteNow = Date.now();
+export function subscribeMinute(cb) {
+  listeners.add(cb);
+  if (!timer) {
+    minuteNow = Date.now(); // fresh when the first card appears, not from page load
+    timer = setInterval(() => { minuteNow = Date.now(); listeners.forEach((l) => l()); }, 30000);
+  }
+  return () => {
+    listeners.delete(cb);
+    if (!listeners.size) { clearInterval(timer); timer = null; }
+  };
+}
+export const getMinuteNow = () => minuteNow;

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useSyncExternalStore } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -9,6 +9,8 @@ import Link from '@mui/material/Link';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
+import CheckCircleIcon from '@mui/icons-material/esm/CheckCircle';
+import CheckCircleOutlineIcon from '@mui/icons-material/esm/CheckCircleOutline';
 import StarIcon from '@mui/icons-material/esm/Star';
 import StarBorderIcon from '@mui/icons-material/esm/StarBorder';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,7 +18,8 @@ import { apiPost } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { downloadIcs, googleCalendarUrl } from '../lib/calendarLinks';
 import { optimistic, sameEventOrSeries } from '../lib/optimistic';
-import { fmtTime } from '../lib/time';
+import { shareEvent } from '../lib/share';
+import { fmtTime, getMinuteNow, relativeLabel, subscribeMinute } from '../lib/time';
 import { TYPE_LABEL, placeLabel, safeUrl } from '../lib/labels';
 
 // Dialogs download only when someone opens one.
@@ -31,8 +34,17 @@ export default function EventCard({ event, showDate = false }) {
   const { user, can } = useAuth();
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState(null); // 'person' | 'cancel' | 'edit'
-  const [menu, setMenu] = useState(null); // { anchor, kind: 'save' | 'calendar' }
+  const [menu, setMenu] = useState(null); // { anchor, kind: 'save' | 'hide' | 'calendar' }
+  const [copied, setCopied] = useState(false);
+  const onShare = async () => {
+    if ((await shareEvent(event)) === 'copied') {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+  const now = useSyncExternalStore(subscribeMinute, getMinuteNow, getMinuteNow);
   const cancelled = event.status === 'cancelled';
+  const soon = !cancelled && relativeLabel(event, now);
   const pending = event.status === 'pending_approval';
   const mine = user?.id === event.creator?.id;
   const over = new Date(event.ends_at) <= new Date();
@@ -91,6 +103,17 @@ export default function EventCard({ event, showDate = false }) {
     else if (event.series_id) setMenu({ anchor: e.currentTarget, kind: 'save' });
     else save.mutate('this');
   };
+  // RSVP (ADR-035): flips at once, count ±1; rolls back if the server refuses.
+  const canGo = event.status === 'active' && !over;
+  const goingCount = event.going_count || 0;
+  const rsvp = useMutation({
+    mutationFn: (yes) => apiPost(`/events/${event.id}/${yes ? 'going' : 'not-going'}`),
+    ...optimistic(
+      qc,
+      (e) => e.id === event.id,
+      (e, yes) => (Boolean(e.going) === yes ? e : { ...e, going: yes, going_count: Math.max(0, (e.going_count || 0) + (yes ? 1 : -1)) }),
+    ),
+  });
   const close = () => setMenu(null);
 
   return (
@@ -107,11 +130,17 @@ export default function EventCard({ event, showDate = false }) {
             </Typography>
             <Chip size="small" label={TYPE_LABEL[event.type]} color={TYPE_COLOR[event.type]} variant="outlined" />
           </Box>
+          {soon && (
+            <Typography variant="caption" sx={{ fontWeight: 700, color: soon.startsWith('Now') ? 'success.main' : 'primary.main' }}>
+              {soon}
+            </Typography>
+          )}
           <Typography variant="body2" color="text.secondary">
             {showDate && `${new Date(event.starts_at).toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric' })} · `}
             {fmtTime(event.starts_at)} – {fmtTime(event.ends_at)} · {placeLabel(event)}
             {cancelled && ' · Cancelled'}
             {pending && ' · Waiting for approval'}
+            {canGo && goingCount > 0 && ` · ${goingCount} going`}
           </Typography>
         </CardActionArea>
         <IconButton
@@ -145,6 +174,21 @@ export default function EventCard({ event, showDate = false }) {
             </Typography>
           )}
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {canGo && (
+              <Button
+                size="small"
+                variant={event.going ? 'contained' : 'outlined'}
+                aria-pressed={Boolean(event.going)}
+                startIcon={event.going ? <CheckCircleIcon /> : <CheckCircleOutlineIcon />}
+                onClick={() => rsvp.mutate(!event.going)}
+                disabled={rsvp.isPending}
+              >
+                {goingCount > 0 ? `Going · ${goingCount}` : 'Going'}
+              </Button>
+            )}
+            {!cancelled && !over && (
+              <Button size="small" variant="outlined" onClick={onShare}>{copied ? 'Link copied' : 'Share'}</Button>
+            )}
             {!cancelled && !over && (
               <Button size="small" variant="outlined" onClick={(e) => setMenu({ anchor: e.currentTarget, kind: 'calendar' })}>
                 Add to calendar

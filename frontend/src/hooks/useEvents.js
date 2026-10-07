@@ -9,6 +9,9 @@ export function useEvents(params) {
     queryKey: ['events', qs],
     queryFn: () => apiGet(`/events?${qs}`),
     refetchInterval: 60000,
+    // Coming back to the app (unlock, switch back, reopen from the home screen)
+    // shows fresh events right away instead of waiting for the next poll.
+    refetchOnWindowFocus: true,
   });
 }
 

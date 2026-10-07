@@ -117,6 +117,10 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 - [x] Map opens fully zoomed out and fits any screen, live on resize/rotation
 - [x] App name + icon swappable in one place (`frontend/brand/`)
 - [x] API: gzip responses, constant query counts on list endpoints
+- [x] Live "Now · ends in 40 min" / "In 25 min" labels on events (ADR-034)
+- [x] Share an event (phone share sheet or copy link); shared links open on Calendar, even after signing in
+- [x] `python -m app.seed --demo`: demo people + current events for local testing
+- [x] RSVPs: "Going" toggle with a live count on every event (ADR-035)
 - [ ] iPhone splash screens (once the final icon/name are chosen)
 
 # Later (not scheduled)

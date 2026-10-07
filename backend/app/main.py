@@ -17,6 +17,7 @@ from app.routers import (
     hidden,
     microsoft_auth,
     moderation,
+    rsvp,
     users,
 )
 
@@ -66,6 +67,7 @@ app.include_router(users.router)
 app.include_router(events.router)
 app.include_router(dev_auth.router)
 app.include_router(favorites.router)
+app.include_router(rsvp.router)
 app.include_router(hidden.router)
 app.include_router(alerts.router)
 app.include_router(microsoft_auth.router)

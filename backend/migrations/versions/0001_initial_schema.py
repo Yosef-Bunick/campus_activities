@@ -2,7 +2,7 @@
 
 Revision ID: 0001
 Revises: 
-Create Date: 2026-10-06 20:03:23.611888
+Create Date: 2026-10-06 20:22:51.009655
 """
 
 from collections.abc import Sequence
@@ -229,6 +229,17 @@ def upgrade() -> None:
     with op.batch_alter_table('report', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_report_event_id'), ['event_id'], unique=False)
 
+    op.create_table('rsvp',
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('event_id', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.ForeignKeyConstraint(['event_id'], ['event.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('user_id', 'event_id')
+    )
+    with op.batch_alter_table('rsvp', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_rsvp_event_id'), ['event_id'], unique=False)
+
     op.create_table('savedevent',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -254,6 +265,10 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_savedevent_user_id'))
 
     op.drop_table('savedevent')
+    with op.batch_alter_table('rsvp', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_rsvp_event_id'))
+
+    op.drop_table('rsvp')
     with op.batch_alter_table('report', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_report_event_id'))
 

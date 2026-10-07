@@ -43,7 +43,7 @@ export function optimistic(qc, match, change, favChange = change) {
       return { snapshot };
     },
     onError: (_err, _vars, ctx) => ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data)),
-    onSettled: () => ['events', 'favorites', 'hidden'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
+    onSettled: () => ['events', 'event', 'favorites', 'hidden'].forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
   };
 }
 

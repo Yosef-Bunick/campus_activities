@@ -140,17 +140,28 @@ export default function MapView() {
             <Box component="img" src={MAP_SRC} alt="Campus map" draggable={false}
               sx={{ width: '100%', height: '100%', display: 'block', userSelect: 'none' }} />
             {pinned.map((r) => {
-              const count = byRoom.get(r.id)?.length || 0;
+              const here = byRoom.get(r.id) || [];
+              const count = here.length;
+              // Something on right now: a soft pulsing ring (none if the phone asks for less motion).
+              const live = here.some((e) => new Date(e.starts_at) <= Date.now() && new Date(e.ends_at) > Date.now());
               return (
                 <ButtonBase
                   key={r.id}
                   onClick={() => setRoom(r)}
-                  aria-label={`${roomLabel(r)}: ${count} event${count === 1 ? '' : 's'}`}
+                  aria-label={`${roomLabel(r)}: ${count} event${count === 1 ? '' : 's'}${live ? ', happening now' : ''}`}
                   sx={{
                     position: 'absolute', left: `${r.map_x * 100}%`, top: `${r.map_y * 100}%`,
                     transform: 'translate(-50%, -50%)', minWidth: 28, height: 28, px: 0.75, borderRadius: 14,
                     bgcolor: count ? 'error.main' : 'grey.600', color: '#fff', fontWeight: 700, fontSize: 13,
                     border: '2px solid #fff', boxShadow: 2,
+                    ...(live && {
+                      '@keyframes livePulse': {
+                        '0%': { boxShadow: '0 0 0 0 rgba(211,47,47,0.55)' },
+                        '100%': { boxShadow: '0 0 0 14px rgba(211,47,47,0)' },
+                      },
+                      animation: 'livePulse 1.6s ease-out infinite',
+                      '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+                    }),
                   }}
                 >
                   {count || r.name}

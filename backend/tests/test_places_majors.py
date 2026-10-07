@@ -119,3 +119,25 @@ def test_removed_major_asks_again(db, tmp_path, monkeypatch):
     f.write_text("Computer Science\n", encoding="utf-8")
     monkeypatch.setattr(majors, "MAJORS_FILE", f)
     assert c.get("/auth/me").json()["needs_major"] is True
+
+
+# ── Shared links: one event ──
+
+
+def test_get_one_event_for_a_shared_link(db, rooms):  # noqa: F811
+    creator = client_for(db, make_user(db))
+    ev = creator.post("/events", json=body(rooms["38"], title="Shared")).json()[0]
+    other = client_for(db, make_user(db))
+    assert other.get(f"/events/{ev['id']}").json()["title"] == "Shared"
+    assert other.get("/events/999999").status_code == 404
+    assert client_for(db).get(f"/events/{ev['id']}").status_code == 401  # signed out
+
+
+def test_pending_event_link_only_works_for_its_creator(db, rooms):  # noqa: F811
+    for _ in range(2):
+        client_for(db, make_user(db)).post("/events", json=body(rooms["108"]))
+    creator = client_for(db, make_user(db))
+    ev = creator.post("/events", json=body(rooms["108"])).json()[0]
+    assert ev["status"] == "pending_approval"
+    assert creator.get(f"/events/{ev['id']}").status_code == 200
+    assert client_for(db, make_user(db)).get(f"/events/{ev['id']}").status_code == 404
