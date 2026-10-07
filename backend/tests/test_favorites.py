@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.models.event import Event
 from app.services.recurrence import NY
 from tests.conftest import client_for, make_user
 from tests.test_events_api import body, rooms  # noqa: F401  (fixture)
@@ -59,3 +60,31 @@ def test_events_list_carries_saved_flag_and_room_position(db, rooms):  # noqa: F
     me.post(f"/events/{ev['id']}/save", json={})
     listed = me.get("/events", params={"end": (datetime.now(NY) + timedelta(days=3)).isoformat()})
     assert listed.json()[0]["saved"] == "event"
+
+
+def test_going_lists_events_i_rsvpd_to(db, rooms):  # noqa: F811
+    me = client_for(db, make_user(db))
+    ev = client_for(db, make_user(db)).post("/events", json=body(rooms["38"])).json()[0]
+    assert me.get("/favorites").json()["going"] == []
+    me.post(f"/events/{ev['id']}/going")
+    going = me.get("/favorites").json()["going"]
+    assert [e["id"] for e in going] == [ev["id"]] and going[0]["going"] is True
+    me.post(f"/events/{ev['id']}/not-going")
+    assert me.get("/favorites").json()["going"] == []
+
+
+def test_mine_lists_my_events_including_pending(db, rooms):  # noqa: F811
+    creator = make_user(db)
+    me = client_for(db, creator)
+    a = me.post("/events", json=body(rooms["38"], title="A")).json()[0]
+    b = me.post("/events", json=body(rooms["26"], title="B", days=2)).json()[0]
+    gone = me.post("/events", json=body(rooms["26"], title="R", days=3)).json()[0]
+    for ev_id, status in ((b["id"], "pending_approval"), (gone["id"], "rejected")):
+        row = db.get(Event, ev_id)
+        row.status = status
+        db.add(row)
+    db.commit()
+    mine = me.get("/favorites").json()["mine"]
+    assert [(e["id"], e["status"]) for e in mine] == [(a["id"], "active"), (b["id"], "pending_approval")]
+    # Someone else never sees my events in their "mine".
+    assert client_for(db, make_user(db)).get("/favorites").json()["mine"] == []

@@ -103,3 +103,41 @@ def test_feed_query_count_stays_constant_with_rsvps(db, rooms):  # noqa: F811
     feed = c.get(feed_url()).json()
     assert len(feed) == 22 and all(e["going_count"] == 2 and e["going"] for e in feed)
     assert queries_for(c, feed_url()) == small
+
+
+def test_people_going_hear_about_a_cancellation(db, rooms):  # noqa: F811
+    from sqlmodel import select
+
+    from app.models.event import Alert
+
+    creator = make_user(db)
+    cc = client_for(db, creator)
+    ev = cc.post("/events", json=body(rooms["38"], title="Jam")).json()[0]
+    fan, other = make_user(db), make_user(db)
+    client_for(db, fan).post(f"/events/{ev['id']}/going")
+    cc.post(f"/events/{ev['id']}/going")  # the creator going too: no extra alert
+    cc.post(f"/events/{ev['id']}/cancel", json={"reason": "Sick"})
+
+    fan_alerts = list(db.exec(select(Alert).where(Alert.user_id == fan.id)))
+    assert len(fan_alerts) == 1 and "you're going to" in fan_alerts[0].message and "Sick" in fan_alerts[0].message
+    assert list(db.exec(select(Alert).where(Alert.user_id == other.id))) == []
+    assert list(db.exec(select(Alert).where(Alert.user_id == creator.id))) == []  # they cancelled it
+
+
+def test_one_alert_for_a_whole_cancelled_series(db, rooms):  # noqa: F811
+    from datetime import datetime, timedelta
+
+    from sqlmodel import select
+
+    from app.models.event import Alert
+    from app.services.recurrence import NY
+
+    cc = client_for(db, make_user(db))
+    until = (datetime.now(NY).date() + timedelta(days=3)).isoformat()
+    evs = cc.post("/events", json=body(rooms["38"], repeat={"freq": "daily", "until": until})).json()
+    fan = make_user(db)
+    for e in evs:
+        client_for(db, fan).post(f"/events/{e['id']}/going")
+    cc.post(f"/events/{evs[0]['id']}/cancel", json={"scope": "series"})
+    alerts = list(db.exec(select(Alert).where(Alert.user_id == fan.id)))
+    assert len(alerts) == 1 and f"{len(evs)} dates" in alerts[0].message

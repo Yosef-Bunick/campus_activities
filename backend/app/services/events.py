@@ -245,7 +245,7 @@ def update(session: Session, user: User, event_id: int, body: EventUpdate) -> Ev
 
 def _cancel_rows(session: Session, actor: User, rows: list[Event], reason: str) -> int:
     now = datetime.now(UTC)
-    count = 0
+    cancelled = []
     for ev in rows:
         live = (EventStatus.ACTIVE.value, EventStatus.PENDING.value)
         if ev.status not in live or as_utc(ev.ends_at) <= now:
@@ -255,9 +255,34 @@ def _cancel_rows(session: Session, actor: User, rows: list[Event], reason: str) 
         ev.cancelled_reason = reason or None
         ev.updated_at = now
         session.add(ev)
-        count += 1
+        cancelled.append(ev)
     session.flush()
-    return count
+    _alert_going(session, actor, cancelled, reason)
+    return len(cancelled)
+
+
+def _alert_going(session: Session, actor: User, cancelled: list[Event], reason: str) -> None:
+    """Everyone who said Going hears about a cancellation: one alert per person
+    per cancel, however many dates it covers (ADR-035). The person cancelling
+    and the creator (alerted separately) are skipped."""
+    from app.models.social import Rsvp
+
+    if not cancelled:
+        return
+    by_id = {ev.id: ev for ev in cancelled}
+    who: dict[int, list[Event]] = {}
+    for r in session.exec(select(Rsvp).where(col(Rsvp.event_id).in_(list(by_id)))):
+        ev = by_id[r.event_id]
+        if r.user_id not in (actor.id, ev.creator_id):
+            who.setdefault(r.user_id, []).append(ev)
+    for user_id, evs in who.items():
+        first = min(evs, key=lambda e: e.starts_at)
+        when = as_utc(first.starts_at).astimezone(NY).strftime("%a %b %d")
+        what = f"“{first.title}” on {when}" if len(evs) == 1 else f"{len(evs)} dates of “{first.title}”"
+        session.add(Alert(
+            user_id=user_id, kind="event_cancelled", event_id=first.id,
+            message=f"{what}, which you're going to, was cancelled" + (f": {reason}" if reason else ""),
+        ))  # fmt: skip
 
 
 def _alert_creator(session: Session, actor: User, ev: Event, count: int, reason: str) -> None:
@@ -333,7 +358,8 @@ def cancel_upcoming_for_ban(session: Session, actor: User, user_id: int) -> int:
             )
         )
     )
-    count = _cancel_rows(session, actor, rows, "Creator was banned")
+    # Neutral wording: people going are told it was cancelled, not why (privacy).
+    count = _cancel_rows(session, actor, rows, "Cancelled by moderators")
     session.commit()
     return count
 

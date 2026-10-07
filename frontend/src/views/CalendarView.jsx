@@ -9,11 +9,12 @@ import Typography from '@mui/material/Typography';
 import PrevIcon from '@mui/icons-material/esm/ChevronLeft';
 import NextIcon from '@mui/icons-material/esm/ChevronRight';
 import FilterIcon from '@mui/icons-material/esm/FilterList';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useSearch } from 'wouter';
 import { apiGet } from '../api';
 import EventCard from '../components/EventCard';
 import EventList from '../components/EventList';
+import PullToRefresh from '../components/PullToRefresh';
 import { toApiParams, useFilter } from '../contexts/FilterContext';
 import { useEvents } from '../hooks/useEvents';
 import { addDays, fmtDay, nyDateKey, nyToDate, weekday } from '../lib/time';
@@ -44,10 +45,16 @@ export default function CalendarView() {
     return p;
   }, [filter, first, last]);
   const query = useEvents(params);
+  const qc = useQueryClient();
+  const refresh = () => Promise.all([
+    qc.refetchQueries({ queryKey: ['events'], type: 'active' }),
+    sharedId && qc.refetchQueries({ queryKey: ['event', sharedId], type: 'active' }),
+  ]);
   const title = view === 'day' ? fmtDay(nyToDate(first, '12:00'))
     : `${fmtDay(nyToDate(first, '12:00'))} – ${fmtDay(nyToDate(addDays(last, -1), '12:00'))}`;
 
   return (
+    <PullToRefresh onRefresh={refresh}>
     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography variant="h5" component="h1" sx={{ flexGrow: 1 }}>Calendar</Typography>
@@ -81,5 +88,6 @@ export default function CalendarView() {
         {filterOpen && <FilterSheet open onClose={() => setFilterOpen(false)} />}
       </Suspense>
     </Box>
+    </PullToRefresh>
   );
 }

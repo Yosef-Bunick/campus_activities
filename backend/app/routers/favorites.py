@@ -1,5 +1,6 @@
 """Favorites (ADR-025): ★ save one event or a whole series, ♥ follow a person.
-/favorites lists saved events + events from people you follow."""
+/favorites lists saved events, events from people you follow, events you're
+going to (ADR-035) and your own upcoming events."""
 
 from datetime import UTC, datetime
 
@@ -10,7 +11,7 @@ from sqlmodel import Session, col, or_, select
 from app.core.auth import current_user
 from app.core.database import get_session
 from app.models.event import Event, EventStatus
-from app.models.social import SavedEvent, UserFavorite
+from app.models.social import Rsvp, SavedEvent, UserFavorite
 from app.models.user import User
 from app.routers.auth import user_public
 from app.routers.events import events_out
@@ -116,10 +117,41 @@ def my_favorites(me: User = Depends(current_user), session: Session = Depends(ge
             .limit(200)
         )
     ) if fav_ids else []  # fmt: skip
-    # One events_out call for both lists shares its lookups (rooms, people, ...).
-    out = events_out(session, saved + from_people, me)
+    S = EventStatus
+    # Going: same statuses as the feeds (cancelled ones show until they end).
+    going = list(
+        session.exec(
+            select(Event)
+            .join(Rsvp, col(Rsvp.event_id) == Event.id)
+            .where(
+                Rsvp.user_id == me.id, Event.ends_at > now,
+                col(Event.status).in_([S.ACTIVE.value, S.CANCELLED.value]),
+            )
+            .order_by(Event.starts_at)
+            .limit(200)
+        )
+    )  # fmt: skip
+    # Mine: also my pending_approval ones, so I can see they're waiting; never rejected.
+    mine = list(
+        session.exec(
+            select(Event)
+            .where(
+                Event.creator_id == me.id, Event.ends_at > now,
+                col(Event.status).in_([S.ACTIVE.value, S.PENDING.value, S.CANCELLED.value]),
+            )
+            .order_by(Event.starts_at)
+            .limit(200)
+        )
+    )  # fmt: skip
+    lists = {"saved": saved, "from_people": from_people, "going": going, "mine": mine}
+    # One events_out call for every list shares its lookups (rooms, people, ...);
+    # dedupe first, since one event can sit in several lists.
+    unique = list({e.id: e for evs in lists.values() for e in evs}.values())
+    by_id = {e.id: o for e, o in zip(unique, events_out(session, unique, me), strict=True)}
     return {
-        "saved": out[: len(saved)],
-        "from_people": out[len(saved) :],
+        "saved": [by_id[e.id] for e in saved],
+        "from_people": [by_id[e.id] for e in from_people],
         "people": [user_public(p) for p in sorted(people, key=lambda p: p.display_name.lower())],
+        "going": [by_id[e.id] for e in going],
+        "mine": [by_id[e.id] for e in mine],
     }

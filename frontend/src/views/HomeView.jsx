@@ -5,7 +5,9 @@ import Chip from '@mui/material/Chip';
 import Fab from '@mui/material/Fab';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/esm/Add';
+import { useQueryClient } from '@tanstack/react-query';
 import EventList from '../components/EventList';
+import PullToRefresh from '../components/PullToRefresh';
 import { TAB_BAR_HEIGHT } from '../components/BottomTabs';
 import { useAuth } from '../contexts/AuthContext';
 import { useEvents } from '../hooks/useEvents';
@@ -45,8 +47,11 @@ export default function HomeView() {
     return p;
   }, [win, recommended]);
   const query = useEvents(params);
+  const qc = useQueryClient();
+  const refresh = () => qc.refetchQueries({ queryKey: ['events'], type: 'active' });
 
   return (
+    <PullToRefresh onRefresh={refresh}>
     <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Typography variant="h5" component="h1">What's on</Typography>
       <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5 }} role="group" aria-label="When">
@@ -78,5 +83,6 @@ export default function HomeView() {
         {dialog === 'major' && <MajorDialog open onClose={() => setDialog(null)} />}
       </Suspense>
     </Box>
+    </PullToRefresh>
   );
 }
