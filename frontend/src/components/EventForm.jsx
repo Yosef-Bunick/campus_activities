@@ -16,7 +16,7 @@ import { apiPatch, apiPost } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useMajors, useRooms } from '../hooks/useEvents';
 import { addDays, fmtDay, nyDateKey, nyTimeKey, nyToDate, weekday } from '../lib/time';
-import { TYPE_LABEL, roomLabel } from '../lib/labels';
+import { TYPE_LABEL, WHERE_LABEL, roomLabel, safeUrl } from '../lib/labels';
 
 const TYPE_PERM = { friend_event: 'event.create.friend', club_event: 'event.create.club', main_event: 'event.create.main' };
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -38,7 +38,10 @@ export default function EventForm({ event, open, onClose }) {
     description: event?.description ?? '',
     majors: event?.majors ?? [],
     type: event?.type ?? 'friend_event',
+    where: event?.location_kind ?? 'campus',
     room_id: event?.room?.id ?? '',
+    location: event?.location ?? '',
+    online_url: event?.online_url ?? '',
     date: event ? nyDateKey(event.starts_at) : today,
     start: event ? nyTimeKey(event.starts_at) : '',
     end: event ? nyTimeKey(event.ends_at) : '',
@@ -54,7 +57,11 @@ export default function EventForm({ event, open, onClose }) {
     let endsAt = nyToDate(f.date, f.end);
     if (endsAt <= startsAt) endsAt = nyToDate(addDays(f.date, 1), f.end); // ends after midnight
     const base = {
-      title: f.title, description: f.description, room_id: Number(f.room_id), majors: f.majors,
+      title: f.title, description: f.description, majors: f.majors,
+      location_kind: f.where,
+      room_id: f.where === 'campus' ? Number(f.room_id) : null,
+      location: f.where === 'off_campus' ? f.location : '',
+      online_url: f.where === 'online' ? f.online_url.trim() : '',
       starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(),
     };
     if (editing) return base;
@@ -81,7 +88,9 @@ export default function EventForm({ event, open, onClose }) {
     ...p, freq, until: p.until || (freq ? addDays(p.date, 28) : ''),
     weekdays: p.weekdays.length ? p.weekdays : [weekday(p.date)],
   }));
-  const ready = f.title.trim() && f.room_id && f.date && f.start && f.end && (!f.freq || f.until);
+  const placeOk = f.where === 'campus' ? Boolean(f.room_id)
+    : f.where === 'off_campus' ? Boolean(f.location.trim()) : Boolean(safeUrl(f.online_url.trim()));
+  const ready = f.title.trim() && placeOk && f.date && f.start && f.end && (!f.freq || f.until);
 
   return (
     <Dialog open={open} onClose={onClose} fullScreen={phone} fullWidth maxWidth="sm">
@@ -95,9 +104,25 @@ export default function EventForm({ event, open, onClose }) {
             ))}
           </TextField>
         )}
-        <TextField select label="Room" value={f.room_id} onChange={set('room_id')} required>
-          {rooms.map((r) => <MenuItem key={r.id} value={r.id}>{roomLabel(r)}</MenuItem>)}
-        </TextField>
+        <ToggleButtonGroup exclusive fullWidth size="small" value={f.where} aria-label="Where"
+          onChange={(_, v) => v && setF((p) => ({ ...p, where: v }))}>
+          {Object.entries(WHERE_LABEL).map(([k, label]) => <ToggleButton key={k} value={k}>{label}</ToggleButton>)}
+        </ToggleButtonGroup>
+        {f.where === 'campus' && (
+          <TextField select label="Room" value={f.room_id} onChange={set('room_id')} required>
+            {rooms.map((r) => <MenuItem key={r.id} value={r.id}>{roomLabel(r)}</MenuItem>)}
+          </TextField>
+        )}
+        {f.where === 'off_campus' && (
+          <TextField label="Where off campus?" value={f.location} onChange={set('location')} required
+            placeholder="e.g. Kensico Dam Plaza, Valhalla" inputProps={{ maxLength: 200 }} />
+        )}
+        {f.where === 'online' && (
+          <TextField label="Link" value={f.online_url} onChange={set('online_url')} required type="url"
+            placeholder="https://zoom.us/j/…" inputProps={{ maxLength: 500 }}
+            error={Boolean(f.online_url) && !safeUrl(f.online_url.trim())}
+            helperText="Zoom, Teams, Meet, Discord… must start with https://" />
+        )}
         <TextField label="Date" type="date" value={f.date} onChange={set('date')}
           inputProps={{ min: today, max: lastDay }} InputLabelProps={{ shrink: true }} />
         <Box sx={{ display: 'flex', gap: 1 }}>

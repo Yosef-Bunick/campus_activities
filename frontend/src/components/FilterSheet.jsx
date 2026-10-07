@@ -6,14 +6,18 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { EVENT_TYPES, useFilter } from '../contexts/FilterContext';
+import { EVENT_TYPES, WHERE, useFilter } from '../contexts/FilterContext';
 import { useRooms } from '../hooks/useEvents';
-import { TYPE_LABEL, roomLabel } from '../lib/labels';
+import { TYPE_LABEL, WHERE_LABEL, roomLabel } from '../lib/labels';
 
 // The shared filter as a bottom sheet (phones). Same filter drives Calendar and Map.
 export default function FilterSheet({ open, onClose }) {
   const { filter, setFilter, reset } = useFilter();
   const { data: rooms = [] } = useRooms();
+  const toggleWhere = (w) => {
+    const where = filter.where.includes(w) ? filter.where.filter((x) => x !== w) : [...filter.where, w];
+    if (where.length) setFilter({ where });
+  };
   const toggleType = (t) => {
     const types = filter.types.includes(t) ? filter.types.filter((x) => x !== t) : [...filter.types, t];
     if (types.length) setFilter({ types });
@@ -27,6 +31,12 @@ export default function FilterSheet({ open, onClose }) {
           {EVENT_TYPES.map((t) => (
             <FormControlLabel key={t} label={TYPE_LABEL[t]}
               control={<Checkbox checked={filter.types.includes(t)} onChange={() => toggleType(t)} />} />
+          ))}
+        </Box>
+        <Box>
+          {WHERE.map((w) => (
+            <FormControlLabel key={w} label={WHERE_LABEL[w]}
+              control={<Checkbox checked={filter.where.includes(w)} onChange={() => toggleWhere(w)} />} />
           ))}
         </Box>
         <TextField

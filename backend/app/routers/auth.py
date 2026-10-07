@@ -10,7 +10,8 @@ from app.core.auth import (
     set_csrf_cookie,
 )
 from app.core.database import get_session
-from app.core.majors import MAJORS, is_major
+from app.core import majors as majors_list
+from app.core.majors import is_major
 from app.core.terms import TERMS, TERMS_VERSION
 from app.core.permissions import Role, limits_for, permissions_for
 from app.models.user import User
@@ -29,7 +30,13 @@ def me(request: Request, response: Response, user: User = Depends(current_user))
     csrf = request.cookies.get(CSRF_COOKIE) or set_csrf_cookie(response)
     role = Role(user.role)
     return {
-        "user": {**user_public(user), "email": user.email, "major": user.major},
+        "user": {
+            **user_public(user), "email": user.email, "major": user.major,
+            "major_label": majors_list.majors().get(user.major or ""),
+        },
+        # Ask for a major at first sign-in, and again if their major was removed
+        # from majors.txt (ADR-032).
+        "needs_major": not is_major(user.major or ""),
         "permissions": permissions_for(role),
         "limits": limits_for(role),
         "csrf_token": csrf,
@@ -40,9 +47,9 @@ def me(request: Request, response: Response, user: User = Depends(current_user))
 
 
 @router.get("/majors")
-def majors(_: User = Depends(current_user)) -> list[dict]:
-    """The pickable majors (core/majors.py)."""
-    return [{"key": k, "label": v} for k, v in MAJORS.items()]
+def list_majors(_: User = Depends(current_user)) -> list[dict]:
+    """The pickable majors, from backend/majors.txt."""
+    return [{"key": k, "label": v} for k, v in majors_list.majors().items()]
 
 
 class MajorBody(BaseModel):

@@ -7,7 +7,7 @@ from sqlmodel import Session, col, select
 
 from app.core.auth import current_user, require
 from app.core.database import get_session
-from app.models.event import Event, EventSeries, EventType
+from app.models.event import Event, EventSeries, EventType, LocationKind
 from app.models.place import Building, Floor, Room
 from app.models.user import User, as_utc
 from pydantic import BaseModel, Field
@@ -87,7 +87,10 @@ def events_out(session: Session, events: list[Event], viewer: User | None = None
             "status": e.status,
             "starts_at": as_utc(e.starts_at),
             "ends_at": as_utc(e.ends_at),
-            "room": rooms.get(e.room_id),
+            "location_kind": e.location_kind,
+            "room": rooms.get(e.room_id) if e.room_id else None,
+            "location": e.location,
+            "online_url": e.online_url,
             "creator": {"id": e.creator_id, "display_name": people[e.creator_id].display_name}
             if e.creator_id in people
             else None,
@@ -110,6 +113,7 @@ def list_rooms(_: User = Depends(current_user), session: Session = Depends(get_s
 @router.get("/events")
 def list_events(
     types: list[EventType] = Query(default=list(EventType)),
+    where: list[LocationKind] = Query(default=list(LocationKind)),
     start: datetime | None = None,
     end: datetime | None = None,
     happening_now: bool = False,
@@ -122,7 +126,7 @@ def list_events(
 ):
     """Used by Home, Calendar and Map — one shared filter."""
     f = EventFilter(
-        types=types, start=start, end=end, happening_now=happening_now,
+        types=types, where=where, start=start, end=end, happening_now=happening_now,
         building_ids=building_ids, room_ids=room_ids, search=search,
         recommended_for=(me.major or "") if recommended else None,
         viewer_id=me.id,

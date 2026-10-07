@@ -42,7 +42,7 @@ The same stack as unified / Accounting Orbit: **React (Vite + MUI)**, installabl
 
 ## Docs
 
-- [docs/roadmap.md](docs/roadmap.md): Phase 1 (bare bones), Phase 2 (rules & polish), and Later
+- [docs/roadmaps/roadmap.md](docs/roadmaps/roadmap.md): Phase 1 (bare bones), Phase 2 (rules & polish), and Later
 - [docs/architecture.md](docs/architecture.md): design, pages, rules, data model, and decisions (ADRs)
 
 ## Repo layout (planned)
@@ -84,7 +84,7 @@ npm install
 npm run dev
 ```
 
-The top bar shows **API ok** when the frontend can reach the backend. Signed-out visitors only see the sign-in page; the **Sign in with Microsoft** button turns on once `MS_CLIENT_ID` / `MS_CLIENT_SECRET` / `OWNER_EMAIL` are in `.env` and the Microsoft login route lands. Roles and limits: edit `backend/app/core/permissions.py`. Majors (for Recommended): edit `backend/app/core/majors.py`.
+The top bar shows **API ok** when the frontend can reach the backend. Signed-out visitors only see the sign-in page; the **Sign in with Microsoft** button turns on once `MS_CLIENT_ID` / `MS_CLIENT_SECRET` / `OWNER_EMAIL` are in `.env` and the Microsoft login route lands. Roles and limits: edit `backend/app/core/permissions.py`. **Majors:** edit `backend/majors.txt`, one per line. New lines show up in the app right away, no restart (ADR-032).
 
 **Turning on Sign in with Microsoft** (one time, in the [Entra admin center](https://entra.microsoft.com) → App registrations → New registration):
 1. Name: the app's name. Supported account types: **Accounts in any organizational directory and personal Microsoft accounts** (so the owner's personal account works; everyone else is still limited to WCC by the app).

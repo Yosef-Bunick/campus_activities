@@ -2,7 +2,10 @@
 //  * .ics file: Apple Calendar (iPhone/Mac), Outlook, Samsung/Android calendar
 //    apps that open .ics, Thunderbird/GNOME on Linux.
 //  * Google Calendar link: Android/Chrome and anyone on Google Calendar.
-import { roomLabel } from './labels';
+import { placeLabel, safeUrl } from './labels';
+
+const where = (e) => (e.location_kind === 'online' ? (safeUrl(e.online_url) || 'Online') : placeLabel(e));
+const details = (e) => [e.description, e.location_kind === 'online' && safeUrl(e.online_url)].filter(Boolean).join('\n\n');
 
 const stamp = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); // 20261006T190000Z
 const escapeIcs = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (c) => `\\${c}`);
@@ -23,8 +26,8 @@ export function icsText(event) {
     `DTSTART:${stamp(event.starts_at)}`,
     `DTEND:${stamp(event.ends_at)}`,
     `SUMMARY:${escapeIcs(event.title)}`,
-    `LOCATION:${escapeIcs(roomLabel(event.room))}`,
-    `DESCRIPTION:${escapeIcs(event.description)}`,
+    `LOCATION:${escapeIcs(where(event))}`,
+    `DESCRIPTION:${escapeIcs(details(event))}`,
     'END:VEVENT', 'END:VCALENDAR',
   ];
   return lines.map(fold).join('\r\n') + '\r\n';
@@ -46,8 +49,8 @@ export function googleCalendarUrl(event) {
     action: 'TEMPLATE',
     text: event.title,
     dates: `${stamp(event.starts_at)}/${stamp(event.ends_at)}`,
-    location: roomLabel(event.room),
-    details: event.description || '',
+    location: where(event),
+    details: details(event),
   });
   return `https://calendar.google.com/calendar/render?${p}`;
 }

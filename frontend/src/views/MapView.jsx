@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -24,9 +24,7 @@ const FilterSheet = lazy(() => import('../components/FilterSheet'));
 const RoomLimit = lazy(() => import('../components/RoomLimit'));
 const MAP_SRC = '/maps/campus.webp'; // WCC_MAP2.png; pins are 0..1 of its width/height
 const MAP_RATIO = 892 / 590;
-const MIN_ZOOM = 1;
 const MAX_ZOOM = 5;
-const clamp = (z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
 // Campus map: each room's pin shows how many events match the shared filter.
 // Tap a room to see its events. Floor-plan SVGs come later, per floor.
@@ -34,11 +32,36 @@ export default function MapView() {
   const { filter, active } = useFilter();
   const { can } = useAuth();
   const [when, setWhen] = useState('today'); // 'now' | 'today'
-  const [zoom, setZoom] = useState(1.6);
+  const [zoom, setZoom] = useState(1); // 1 = fill width; set to the "fit screen" scale once measured
+  const [fit, setFit] = useState(1); // scale that shows the whole map, no cropping
   const [room, setRoom] = useState(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const pinch = useRef(null);
+  const viewportRef = useRef(null);
+  const userZoomed = useRef(false);
   const { data: rooms = [] } = useRooms();
+
+  const clampZoom = (z) => Math.min(MAX_ZOOM, Math.max(fit, z));
+
+  // Fit the whole map to the screen: scale so neither width nor height overflows,
+  // so the map is never cropped/zoomed-in on load or when the window resizes.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => {
+      const { width: w, height: h } = el.getBoundingClientRect();
+      if (!w || !h) return;
+      // Map height = width × MAP_RATIO, so it fits when zoom × w × MAP_RATIO ≤ h.
+      const f = Math.min(1, h / (w * MAP_RATIO));
+      setFit(f);
+      if (!userZoomed.current) setZoom(f);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const params = useMemo(() => {
     const p = toApiParams(filter);
@@ -55,12 +78,21 @@ export default function MapView() {
     }
     return m;
   }, [query.data]);
+  // Off-campus and online events have no pin; they get their own list (ADR-032).
+  const elsewhere = useMemo(
+    () => (query.data || []).filter((e) => !e.room && e.status !== 'rejected'),
+    [query.data],
+  );
+  const [elsewhereOpen, setElsewhereOpen] = useState(false);
 
   // Two-finger pinch zooms the map only (one finger still scrolls it).
   const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
   const onTouchStart = (e) => { if (e.touches.length === 2) pinch.current = { d: dist(e.touches), z: zoom }; };
   const onTouchMove = (e) => {
-    if (e.touches.length === 2 && pinch.current) setZoom(clamp(pinch.current.z * (dist(e.touches) / pinch.current.d)));
+    if (e.touches.length === 2 && pinch.current) {
+      userZoomed.current = true;
+      setZoom(clampZoom(pinch.current.z * (dist(e.touches) / pinch.current.d)));
+    }
   };
   const onTouchEnd = () => { pinch.current = null; };
 
@@ -79,14 +111,20 @@ export default function MapView() {
           <IconButton aria-label="Filter" onClick={() => setFilterOpen(true)}><FilterIcon /></IconButton>
         </Badge>
       </Box>
+      {elsewhere.length > 0 && (
+        <Button size="small" onClick={() => setElsewhereOpen(true)} sx={{ mx: 1.5, mb: 1, alignSelf: 'flex-start' }}>
+          Off campus &amp; online ({elsewhere.length})
+        </Button>
+      )}
 
       <Box sx={{ position: 'relative', flex: 1, minHeight: 0 }}>
         <Box
+          ref={viewportRef}
           data-testid="map-viewport"
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-          sx={{ position: 'absolute', inset: 0, overflow: 'auto', touchAction: 'pan-x pan-y', bgcolor: '#cfe3b4' }}
+          sx={{ position: 'absolute', inset: 0, overflow: 'auto', touchAction: 'pan-x pan-y', bgcolor: '#cfe3b4', display: 'flex' }}
         >
-          <Box sx={{ position: 'relative', width: `${zoom * 100}%`, aspectRatio: `1 / ${MAP_RATIO}` }}>
+          <Box sx={{ position: 'relative', flexShrink: 0, margin: 'auto', width: `${zoom * 100}%`, aspectRatio: `1 / ${MAP_RATIO}` }}>
             <Box component="img" src={MAP_SRC} alt="Campus map" draggable={false}
               sx={{ width: '100%', height: '100%', display: 'block', userSelect: 'none' }} />
             {pinned.map((r) => {
@@ -110,8 +148,8 @@ export default function MapView() {
           </Box>
         </Box>
         <Paper sx={{ position: 'absolute', right: 12, bottom: 12, display: 'flex', flexDirection: 'column' }}>
-          <IconButton aria-label="Zoom in" onClick={() => setZoom((z) => clamp(z * 1.4))}><AddIcon /></IconButton>
-          <IconButton aria-label="Zoom out" onClick={() => setZoom((z) => clamp(z / 1.4))}><RemoveIcon /></IconButton>
+          <IconButton aria-label="Zoom in" onClick={() => { userZoomed.current = true; setZoom((z) => clampZoom(z * 1.4)); }}><AddIcon /></IconButton>
+          <IconButton aria-label="Zoom out" onClick={() => { userZoomed.current = true; setZoom((z) => clampZoom(z / 1.4)); }}><RemoveIcon /></IconButton>
         </Paper>
       </Box>
 
@@ -130,6 +168,14 @@ export default function MapView() {
             <Button onClick={() => setRoom(null)}>Close</Button>
           </Box>
         )}
+      </Drawer>
+      <Drawer anchor="bottom" open={elsewhereOpen} onClose={() => setElsewhereOpen(false)}
+        PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '75dvh' } }}>
+        <Box sx={{ p: 2, pb: 'calc(16px + env(safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Typography variant="h6" component="h2">Off campus &amp; online</Typography>
+          <EventList query={{ ...query, data: elsewhere }} grouped={false} empty="Nothing off campus or online." />
+          <Button onClick={() => setElsewhereOpen(false)}>Close</Button>
+        </Box>
       </Drawer>
       <Suspense fallback={null}>
         {filterOpen && <FilterSheet open onClose={() => setFilterOpen(false)} />}

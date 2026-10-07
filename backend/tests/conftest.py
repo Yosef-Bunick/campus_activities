@@ -17,6 +17,12 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlmodel import Session, SQLModel  # noqa: E402
 
+from pathlib import Path  # noqa: E402
+
+from app.core import majors as _majors  # noqa: E402
+
+_majors.MAJORS_FILE = Path(__file__).parent / "majors_test.txt"
+
 import app.models.event  # noqa: E402,F401  (registers tables)
 import app.models.moderation  # noqa: E402,F401
 import app.models.place  # noqa: E402,F401

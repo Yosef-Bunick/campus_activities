@@ -9,6 +9,7 @@ import { useAuth } from './contexts/AuthContext';
 import { FilterProvider } from './contexts/FilterContext';
 
 const TermsDialog = lazy(() => import('./components/TermsDialog'));
+const MajorDialog = lazy(() => import('./components/MajorDialog'));
 
 function Loading() {
   return (
@@ -20,7 +21,7 @@ function Loading() {
 
 export default function App() {
   const [location] = useLocation();
-  const { user, loading, terms } = useAuth();
+  const { user, loading, terms, needsMajor } = useAuth();
   if (loading) return <Loading />;
   // Signed-out people only get the sign-in page; signed-in people skip it.
   if (!user && location !== '/') return <Redirect to="/" replace />;
@@ -50,6 +51,8 @@ export default function App() {
       {signedInArea && <BottomTabs />}
       {/* First sign-in (or new terms): agree before using the app. */}
       {user && terms && <Suspense fallback={null}><TermsDialog /></Suspense>}
+      {/* Then their major (for Recommended). Also asked if it's removed from majors.txt. */}
+      {user && !terms && needsMajor && <Suspense fallback={null}><MajorDialog open required /></Suspense>}
     </FilterProvider>
   );
 }

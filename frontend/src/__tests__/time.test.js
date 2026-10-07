@@ -22,9 +22,10 @@ describe('New York time', () => {
 
 describe('shared filter', () => {
   it('keeps the URL short and maps to API params', () => {
-    const f = { types: ['club_event'], rooms: [2, 3], q: 'chess' };
+    const f = { types: ['club_event'], where: ['campus', 'off_campus', 'online'], rooms: [2, 3], q: 'chess' };
     expect(toSearch(f)).toBe('?types=club_event&rooms=2%2C3&q=chess');
     expect(toApiParams(f).toString()).toBe('types=club_event&room_ids=2&room_ids=3&search=chess');
-    expect(toSearch({ types: ['main_event', 'club_event', 'friend_event'], rooms: [], q: '' })).toBe('');
+    expect(toSearch({ types: ['main_event', 'club_event', 'friend_event'], where: ['campus', 'off_campus', 'online'], rooms: [], q: '' })).toBe('');
+    expect(toSearch({ ...f, types: ['main_event', 'club_event', 'friend_event'], rooms: [], q: '', where: ['online'] })).toBe('?where=online');
   });
 });

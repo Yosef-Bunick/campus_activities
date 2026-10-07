@@ -23,6 +23,14 @@ class EventStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class LocationKind(str, Enum):
+    """Where an event happens (ADR-032)."""
+
+    CAMPUS = "campus"  # a Room; room limits apply, shows on the map
+    OFF_CAMPUS = "off_campus"  # a place name / address
+    ONLINE = "online"  # a link (Zoom, Teams, Discord, …)
+
+
 class Freq(str, Enum):
     DAILY = "daily"
     WEEKLY = "weekly"
@@ -47,7 +55,10 @@ class Event(SQLModel, table=True):
     title: str = Field(max_length=120)
     description: str = Field(default="", max_length=2000)
     type: str = Field(max_length=20)  # exactly one EventType value
-    room_id: int = Field(foreign_key="room.id", index=True)
+    location_kind: str = Field(default=LocationKind.CAMPUS.value, max_length=12)
+    room_id: int | None = Field(default=None, foreign_key="room.id", index=True)  # campus only
+    location: str = Field(default="", max_length=200)  # off campus: place / address
+    online_url: str = Field(default="", max_length=500)  # online: http(s) link
     # Majors this event is relevant to, stored ",key1,key2," so a LIKE match is exact.
     majors: str = Field(default="", max_length=200)
     starts_at: datetime = Field(index=True)  # UTC

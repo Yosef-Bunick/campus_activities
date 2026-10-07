@@ -16,7 +16,7 @@ import { apiPost } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { downloadIcs, googleCalendarUrl } from '../lib/calendarLinks';
 import { fmtTime } from '../lib/time';
-import { TYPE_LABEL, roomLabel } from '../lib/labels';
+import { TYPE_LABEL, placeLabel, safeUrl } from '../lib/labels';
 
 // Dialogs download only when someone opens one.
 const PersonSheet = lazy(() => import('./PersonSheet'));
@@ -101,7 +101,7 @@ export default function EventCard({ event, showDate = false }) {
           </Box>
           <Typography variant="body2" color="text.secondary">
             {showDate && `${new Date(event.starts_at).toLocaleDateString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric' })} · `}
-            {fmtTime(event.starts_at)} – {fmtTime(event.ends_at)} · {roomLabel(event.room)}
+            {fmtTime(event.starts_at)} – {fmtTime(event.ends_at)} · {placeLabel(event)}
             {cancelled && ' · Cancelled'}
             {pending && ' · Waiting for approval'}
           </Typography>
@@ -119,6 +119,12 @@ export default function EventCard({ event, showDate = false }) {
       {open && (
         <Box sx={{ px: 1.5, pb: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {event.description && <Typography variant="body2">{event.description}</Typography>}
+          {event.location_kind === 'online' && safeUrl(event.online_url) && !cancelled && (
+            <Button size="small" variant="contained" href={safeUrl(event.online_url)} target="_blank"
+              rel="noopener noreferrer" sx={{ alignSelf: 'flex-start' }}>
+              Join online
+            </Button>
+          )}
           {cancelled && event.cancelled_reason && (
             <Typography variant="body2" color="error">{event.cancelled_reason}</Typography>
           )}

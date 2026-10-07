@@ -1,0 +1,57 @@
+# Majors people can pick in the app (and tag events with, for Recommended).
+#
+# One major per line. To add one, just add a line and save; the app picks it
+# up on its own, no restart. Lines starting with # are ignored.
+#
+# Renaming a line counts as a new major: anyone who picked the old name is
+# asked to choose again. So prefer adding over renaming.
+#
+# Source: WCC academic catalog, Fall 2026 – Summer 2027, "Programs of Study"
+# (catalog.sunywcc.edu). Degree programs only; A.A./A.S./A.A.S. merged.
+# Concentrations (e.g. Psychology, Biology, Civil Engineering) can be added as
+# their own lines if you want finer choices.
+Undeclared
+Accounting and Finance
+Addiction Counseling
+Adolescence Education (Teacher Education Transfer)
+Art and Design
+Business Management
+Business Technologies
+Childhood Education (Teacher Education Transfer)
+Civil Technology
+Communications and Media Arts
+Computer Information Systems
+Computer Science
+Criminal Justice
+Culinary Arts and Hospitality Management
+Cybersecurity
+Digital Filmmaking
+Early Childhood
+Electrical Technology
+Energy Systems
+Engineering Science
+Environmental Science
+Environmental Studies
+Fashion Design & Technology
+Fashion Merchandising
+Health and Human Performance
+Health Information Technology
+Health Studies
+Human Services
+Interactive Technologies
+Journalism
+Justice Studies
+Liberal Arts and Sciences: Humanities
+Liberal Arts and Sciences: Mathematics and Science
+Liberal Arts and Sciences: Social Sciences
+Marketing
+Mechanical Technology
+Networking
+Nursing
+Nutrition
+Paralegal
+Paramedic
+Performing Arts
+Radiologic Technology
+Respiratory Care
+Veterinary Technology

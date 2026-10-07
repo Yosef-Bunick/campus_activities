@@ -1,0 +1,8 @@
+# Fixed majors for tests, so editing backend/majors.txt never breaks them.
+Undeclared
+Business
+Computer Science
+Engineering
+Liberal Arts
+Nursing
+Visual Arts

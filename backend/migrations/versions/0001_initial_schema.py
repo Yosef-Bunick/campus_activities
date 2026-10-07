@@ -2,7 +2,7 @@
 
 Revision ID: 0001
 Revises: 
-Create Date: 2026-10-05 23:35:47.770127
+Create Date: 2026-10-06 20:03:23.611888
 """
 
 from collections.abc import Sequence
@@ -137,7 +137,10 @@ def upgrade() -> None:
     sa.Column('title', sqlmodel.sql.sqltypes.AutoString(length=120), nullable=False),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(length=2000), nullable=False),
     sa.Column('type', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=False),
-    sa.Column('room_id', sa.Integer(), nullable=False),
+    sa.Column('location_kind', sqlmodel.sql.sqltypes.AutoString(length=12), nullable=False),
+    sa.Column('room_id', sa.Integer(), nullable=True),
+    sa.Column('location', sqlmodel.sql.sqltypes.AutoString(length=200), nullable=False),
+    sa.Column('online_url', sqlmodel.sql.sqltypes.AutoString(length=500), nullable=False),
     sa.Column('majors', sqlmodel.sql.sqltypes.AutoString(length=200), nullable=False),
     sa.Column('starts_at', sa.DateTime(), nullable=False),
     sa.Column('ends_at', sa.DateTime(), nullable=False),

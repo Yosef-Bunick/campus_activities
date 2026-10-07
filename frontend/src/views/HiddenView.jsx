@@ -7,7 +7,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../api';
-import { roomLabel } from '../lib/labels';
+import { placeLabel } from '../lib/labels';
 import { fmtDay, fmtTime } from '../lib/time';
 
 // People and events you've hidden, each with Unhide (architecture §3).
@@ -45,7 +45,7 @@ export default function HiddenView() {
             <ListItem key={`${e.hidden}-${e.id}`} divider secondaryAction={button(`/events/${e.id}/unhide`)}>
               <ListItemText
                 primary={e.hidden === 'series' ? `${e.title} (all dates)` : e.title}
-                secondary={`${fmtDay(e.starts_at)} ${fmtTime(e.starts_at)} · ${roomLabel(e.room)}`}
+                secondary={`${fmtDay(e.starts_at)} ${fmtTime(e.starts_at)} · ${placeLabel(e)}`}
               />
             </ListItem>
           ))}

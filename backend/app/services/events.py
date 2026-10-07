@@ -7,10 +7,10 @@ from datetime import UTC, datetime, time, timedelta
 from sqlmodel import Session, col, or_, select
 
 from app.core import permissions as P
-from app.models.event import Alert, Event, EventSeries, EventStatus, EventType, Freq
+from app.models.event import Alert, Event, EventSeries, EventStatus, EventType, Freq, LocationKind
 from app.models.place import Floor, Room
 from app.models.user import User, as_utc
-from app.schemas.events import CancelScope, EventCreate, EventFilter, EventUpdate
+from app.schemas.events import CancelScope, EventCreate, EventFilter, EventUpdate, check_place
 from app.services import event_rules as R
 from app.services import moderation as M
 from app.services.recurrence import NY, expand, ny_date
@@ -35,10 +35,28 @@ def _room(session: Session, room_id: int) -> Room:
     return room
 
 
+def _place(session: Session, kind: str, room_id, location: str, online_url: str):
+    """(Room or None, the place fields to store). Only campus events have a room."""
+    try:
+        check_place(LocationKind(kind), room_id, location, online_url)
+    except ValueError as e:
+        raise R.RuleError(str(e)) from None
+    campus = kind == LocationKind.CAMPUS.value
+    room = _room(session, room_id) if campus else None
+    return room, {
+        "location_kind": kind,
+        "room_id": room.id if room else None,
+        "location": "" if campus or kind == LocationKind.ONLINE.value else location.strip(),
+        "online_url": online_url.strip() if kind == LocationKind.ONLINE.value else "",
+    }
+
+
 def create(session: Session, user: User, body: EventCreate) -> list[Event]:
     R.check_type(user, body.type)
     R.check_times(body.starts_at, body.ends_at)
-    room = _room(session, body.room_id)
+    room, place = _place(
+        session, body.location_kind.value, body.room_id, body.location, body.online_url
+    )
     try:
         R.check_daily_cap(session, user)
     except R.RuleError:
@@ -78,12 +96,12 @@ def create(session: Session, user: User, body: EventCreate) -> list[Event]:
         session.flush()
     template = {
         "title": body.title.strip(), "description": body.description.strip(),
-        "type": body.type.value, "majors": pack_majors(body.majors),
+        "type": body.type.value, "majors": pack_majors(body.majors), **place,
     }  # fmt: skip
     return save_dates(session, user, room, occurrences, template, series)
 
 
-def check_dates(session: Session, user: User, room: Room, occurrences) -> set:
+def check_dates(session: Session, user: User, room: Room | None, occurrences) -> set:
     """Every date must pass the rules. A full room isn't a conflict any more
     (Phase 2): those dates go to SGA/owner approval. Returns their start times."""
     conflicts, pending = [], set()
@@ -99,13 +117,13 @@ def check_dates(session: Session, user: User, room: Room, occurrences) -> set:
 
 
 def save_dates(
-    session: Session, user: User, room: Room, occurrences, template: dict,
+    session: Session, user: User, room: Room | None, occurrences, template: dict,
     series: EventSeries | None,
 ) -> list[Event]:  # fmt: skip
     pending = check_dates(session, user, room, occurrences)
     events = [
         Event(
-            series_id=series.id if series else None, room_id=room.id, starts_at=s, ends_at=e,
+            series_id=series.id if series else None, starts_at=s, ends_at=e,
             creator_id=user.id, **template,
             status=EventStatus.PENDING.value if s in pending else EventStatus.ACTIVE.value,
         )  # fmt: skip
@@ -113,7 +131,7 @@ def save_dates(
     ]
     session.add_all(events)
     session.flush()
-    if pending:
+    if pending and room is not None:
         first = next(ev for ev in events if ev.status == EventStatus.PENDING.value)
         days = sorted({ny_date(s) for s in pending})
         when = ", ".join(d.strftime("%a %b %d") for d in days[:5])
@@ -165,9 +183,13 @@ def extend_series(
     ]
     if not occurrences:
         raise R.RuleError("No new dates to add")
-    template = {"title": last.title, "description": last.description, "type": last.type,
-                "majors": last.majors}  # fmt: skip
-    events = save_dates(session, creator, _room(session, last.room_id), occurrences, template, series)
+    template = {
+        "title": last.title, "description": last.description, "type": last.type,
+        "majors": last.majors, "location_kind": last.location_kind, "room_id": last.room_id,
+        "location": last.location, "online_url": last.online_url,
+    }  # fmt: skip
+    room = _room(session, last.room_id) if last.room_id else None
+    events = save_dates(session, creator, room, occurrences, template, series)
     series.ends_on = until
     session.add(series)
     session.commit()
@@ -193,7 +215,13 @@ def update(session: Session, user: User, event_id: int, body: EventUpdate) -> Ev
     starts_at = body.starts_at or as_utc(ev.starts_at)
     ends_at = body.ends_at or as_utc(ev.ends_at)
     R.check_times(starts_at, ends_at)
-    room = _room(session, body.room_id or ev.room_id)
+    kind = body.location_kind.value if body.location_kind else ev.location_kind
+    room, place = _place(
+        session, kind,
+        body.room_id if body.room_id is not None else ev.room_id,
+        body.location if body.location is not None else ev.location,
+        body.online_url if body.online_url is not None else ev.online_url,
+    )  # fmt: skip
     # Rules are checked as the creator, so the owner editing doesn't lift their limits.
     creator = session.get(User, ev.creator_id)
     problem = R.occurrence_problem(session, creator, room, starts_at, ends_at, {ev.id})
@@ -205,7 +233,9 @@ def update(session: Session, user: User, event_id: int, body: EventUpdate) -> Ev
             setattr(ev, field, value.strip())
     if body.majors is not None:
         ev.majors = pack_majors(body.majors)
-    ev.room_id, ev.starts_at, ev.ends_at = room.id, starts_at, ends_at
+    for k, v in place.items():
+        setattr(ev, k, v)
+    ev.starts_at, ev.ends_at = starts_at, ends_at
     ev.updated_at = datetime.now(UTC)
     session.add(ev)
     session.commit()
@@ -352,6 +382,8 @@ def list_events(session: Session, f: EventFilter) -> list[Event]:
     q = q.where(or_(*visible), col(Event.type).in_([t.value for t in (f.types or list(EventType))]))
     if f.viewer_id is not None:
         q = exclude_hidden(q, f.viewer_id)
+    if f.where and len(f.where) < len(LocationKind):
+        q = q.where(col(Event.location_kind).in_([w.value for w in f.where]))
     if f.room_ids:
         q = q.where(col(Event.room_id).in_(f.room_ids))
     if f.recommended_for is not None:

@@ -13,25 +13,26 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMajors } from '../hooks/useEvents';
 
 // Pick your major: Recommended shows main events + events tagged for it (ADR-028).
-export default function MajorDialog({ open, onClose }) {
+// `required`: the first-sign-in prompt (no cancel, must pick one).
+export default function MajorDialog({ open, onClose, required = false }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const { data: majors = [] } = useMajors();
-  const [major, setMajor] = useState(user?.major ?? '');
+  const [major, setMajor] = useState(required ? '' : user?.major ?? '');
   const save = useMutation({
     mutationFn: () => apiPut('/auth/me/major', { major: major || null }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['me'] });
       qc.invalidateQueries({ queryKey: ['events'] });
-      onClose();
+      onClose?.();
     },
   });
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Your major</DialogTitle>
+    <Dialog open={open} onClose={required ? undefined : onClose} disableEscapeKeyDown={required} fullWidth maxWidth="xs">
+      <DialogTitle>{required ? "What's your major?" : 'Your major'}</DialogTitle>
       <DialogContent sx={{ pt: '8px !important' }}>
         <TextField select fullWidth label="Major" value={major} onChange={(e) => setMajor(e.target.value)}>
-          <MenuItem value="">Not set</MenuItem>
+          {!required && <MenuItem value="">Not set</MenuItem>}
           {majors.map((m) => <MenuItem key={m.key} value={m.key}>{m.label}</MenuItem>)}
         </TextField>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
@@ -40,8 +41,10 @@ export default function MajorDialog({ open, onClose }) {
         {save.error && <Typography color="error" variant="body2">{save.error.message}</Typography>}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>Save</Button>
+        {!required && <Button onClick={onClose}>Cancel</Button>}
+        <Button variant="contained" disabled={save.isPending || (required && !major)} onClick={() => save.mutate()}>
+          {required ? 'Continue' : 'Save'}
+        </Button>
       </DialogActions>
     </Dialog>
   );

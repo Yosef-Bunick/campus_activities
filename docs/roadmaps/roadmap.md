@@ -58,7 +58,9 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 - [x] Rooms: the 4 test rooms from `pin-map.html` (38, 26, 25D on floor 1; 108 on floor 2) in a placeholder "Test building", seeded by `python -m app.seed`
 - [x] **`/home`**: happening now + next 4 hours, plus a **+ New event** button
 - [x] Home **time chips** (Now · Next 4h · Today · This week) and a **Recommended** chip: main events + events tagged for your major (ADR-028). Pick your major in the profile menu; tag up to 3 majors on an event
-- [ ] Replace the placeholder majors in `backend/app/core/majors.py` with WCC's real program list
+- [x] Majors are WCC's 44 degree programs (catalog Fall 2026 – Summer 2027) in `backend/majors.txt`, one per line; add a line to add a major, no code or restart (ADR-032)
+- [x] New users pick their major right after the terms (asked again if their major is removed from the list)
+- [x] **Off-campus and online events**: each event is on campus (a room), off campus (a place/address) or online (an https link with a Join online button). Room limits only apply on campus; the Map lists off-campus & online events separately; the shared filter has a Where setting (ADR-032)
 - [x] **`/calendar`**: day / week / list
 - [x] **Shared filter** (bottom sheet on phones), synced to the URL and shared by Calendar and Map
 - [x] Times stored in UTC and shown in New York time (`tzdata` on the server, the browser's `Intl` on phones; ADR-021)

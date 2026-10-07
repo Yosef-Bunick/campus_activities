@@ -100,7 +100,7 @@ export const ROUTES = {
 ```
 campus-events/
 ├── docs/
-│   ├── roadmap.md
+│   ├── roadmaps/roadmap.md
 │   └── architecture.md
 ├── frontend/                      # React + Vite PWA (mirrors unified/ledger-ui)
 │   ├── public/
@@ -445,6 +445,7 @@ Scheduling limits are **not** env vars. They live in `permissions.py` (§5), so 
 | ADR-029 | **Microsoft sign-in details.** The `common` endpoint (so the owner may use a personal Microsoft account); state + nonce + PKCE kept in a 10-minute HMAC-signed cookie (`SESSION_SECRET`), no server-side session store; ID token checked with joserfc (already a dependency of authlib) against Microsoft's published keys, with audience, `iss == https://login.microsoftonline.com/{tid}/v2.0`, expiry and nonce. Email = `email` or `preferred_username`. **Narrows ADR-003:** `OWNER_EMAIL` is honoured only from the WCC tenant or Microsoft's personal-account tenant (`9188040d-…`), because any other tenant's admin can put any email on an account | Accepted |
 | ADR-030 | **Sentry is opt-in and private.** Backend `sentry-sdk` and frontend `@sentry/react` start only when `SENTRY_DSN` / `VITE_SENTRY_DSN` are set, with `send_default_pii=False` (no IPs, cookies or request bodies). The frontend loads Sentry with a dynamic import, so it never counts against the first-load budget (when unset, the bundler drops it entirely) | Accepted |
 | ADR-031 | **Phase 2 mechanics.** (a) Room approval: only a full room becomes `pending_approval`; other rule breaks are still conflicts; pending events don't count toward room limits; one `approval_needed` alert per request to everyone with `event.approve_overlap`; approving/rejecting applies to the series' pending dates. (b) Abuse flags alert everyone with `user.ban`, once when a threshold is reached; thresholds live in `permissions.py`. (c) The daily purge runs as a background task inside the API (no paid cron); `WORKER_ENABLED=0` turns it off. (d) Deletion is explicit row-by-row (not DB cascades) so SQLite and Postgres behave the same. (e) Offline = Workbox `NetworkFirst` cache of API reads, per device, deleted at sign-out | Accepted |
+| ADR-032 | **Where + majors.** Every event has `location_kind`: `campus` (a `Room`; room limits and the map apply), `off_campus` (free-text place/address) or `online` (an http(s) link, checked on the server and linked with `rel=noopener`). Self double-booking applies to all kinds. Majors live in `backend/majors.txt`, one per line, re-read when the file changes (no restart); the key is a slug of the line, so renaming orphans the old key and those people are asked again. New users are asked for a major right after the terms. Starting list: WCC's 44 degree programs from the Fall 2026 – Summer 2027 catalog. Extends ADR-028 | Accepted |
 
 ---
 

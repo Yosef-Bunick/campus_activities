@@ -4,14 +4,17 @@ import { useLocation, useSearch } from 'wouter';
 // THE one shared filter (architecture §11). Calendar and Map both read it, and
 // it's mirrored to the URL (?types=…&rooms=…&q=…) so links and tab switches keep it.
 export const EVENT_TYPES = ['main_event', 'club_event', 'friend_event'];
+export const WHERE = ['campus', 'off_campus', 'online'];
 export const FILTER_PAGES = ['/calendar', '/map'];
-const EMPTY = { types: EVENT_TYPES, rooms: [], q: '' };
+const EMPTY = { types: EVENT_TYPES, where: WHERE, rooms: [], q: '' };
 
 function fromSearch(search) {
   const p = new URLSearchParams(search);
   const types = (p.get('types') || '').split(',').filter((t) => EVENT_TYPES.includes(t));
+  const where = (p.get('where') || '').split(',').filter((w) => WHERE.includes(w));
   return {
     types: types.length ? types : EVENT_TYPES,
+    where: where.length ? where : WHERE,
     rooms: (p.get('rooms') || '').split(',').filter(Boolean).map(Number),
     q: p.get('q') || '',
   };
@@ -20,6 +23,7 @@ function fromSearch(search) {
 export function toSearch(f) {
   const p = new URLSearchParams();
   if (f.types.length !== EVENT_TYPES.length) p.set('types', f.types.join(','));
+  if (f.where.length !== WHERE.length) p.set('where', f.where.join(','));
   if (f.rooms.length) p.set('rooms', f.rooms.join(','));
   if (f.q) p.set('q', f.q);
   const s = p.toString();
@@ -30,6 +34,7 @@ export function toSearch(f) {
 export function toApiParams(f) {
   const p = new URLSearchParams();
   f.types.forEach((t) => p.append('types', t));
+  if (f.where.length !== WHERE.length) f.where.forEach((w) => p.append('where', w));
   f.rooms.forEach((r) => p.append('room_ids', r));
   if (f.q) p.set('search', f.q);
   return p;
@@ -62,7 +67,8 @@ export function FilterProvider({ children }) {
     });
   }, [onFilterPage, location, navigate]);
 
-  const active = filter.types.length !== EVENT_TYPES.length || filter.rooms.length > 0 || Boolean(filter.q);
+  const active = filter.types.length !== EVENT_TYPES.length || filter.where.length !== WHERE.length
+    || filter.rooms.length > 0 || Boolean(filter.q);
   const value = useMemo(
     () => ({ filter, setFilter, reset: () => setFilter(EMPTY), active }),
     [filter, setFilter, active],

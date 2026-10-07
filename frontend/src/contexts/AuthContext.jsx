@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
     permissions: me?.permissions ?? [],
     limits: me?.limits ?? null,
     terms: me?.terms ?? null, // non-null = must agree before using the app
+    needsMajor: Boolean(me?.needs_major), // asked right after the terms (ADR-032)
     refresh: () => qc.invalidateQueries({ queryKey: ['me'] }),
     can: (perm) => Boolean(me?.permissions.includes(perm)),
     signOut: async () => {

@@ -82,7 +82,7 @@ def _overlapping(start: datetime, end: datetime, exclude_ids: set[int]):
 def occurrence_problem(
     session: Session,
     user: User,
-    room: Room,
+    room: Room | None,  # None = off campus / online: no room limit
     start: datetime,
     end: datetime,
     exclude_ids: set[int] = frozenset(),
@@ -101,6 +101,8 @@ def occurrence_problem(
         if mine is not None:
             return f"You already have “{mine.title}” then"
     # Rule 4: room limit. P1 blocks the 3rd; P2 turns it into an approval request.
+    if room is None:
+        return None
     limit = room.max_overlapping or P.ROOM_MAX_OVERLAPPING
     in_room = session.exec(
         select(func.count()).select_from(

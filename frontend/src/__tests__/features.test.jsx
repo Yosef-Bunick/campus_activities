@@ -151,3 +151,44 @@ describe('phase 2', () => {
     await waitFor(() => expect(accept).toHaveBeenCalled());
   });
 });
+
+describe('places and majors', () => {
+  const ME = { user: { id: 1 }, permissions: [], limits: {}, csrf_token: 't' };
+
+  it('shows an online event with a safe Join online link', async () => {
+    api({ '/auth/me': ME });
+    renderPage(() => <EventCard event={{ ...EVENT, location_kind: 'online', room: null, online_url: 'https://zoom.us/j/1' }} />);
+    expect(await screen.findByText(/Online/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('heading', { name: 'Study, group' }));
+    const link = screen.getByRole('link', { name: 'Join online' });
+    expect(link.getAttribute('href')).toBe('https://zoom.us/j/1');
+    expect(link.getAttribute('rel')).toContain('noopener');
+  });
+
+  it('never links a non-http URL', async () => {
+    api({ '/auth/me': ME });
+    renderPage(() => <EventCard event={{ ...EVENT, location_kind: 'online', room: null, online_url: 'javascript:alert(1)' }} />);
+    fireEvent.click(await screen.findByRole('heading', { name: 'Study, group' }));
+    expect(screen.queryByRole('link', { name: 'Join online' })).toBeNull();
+  });
+
+  it('shows an off-campus place', async () => {
+    api({ '/auth/me': ME });
+    renderPage(() => <EventCard event={{ ...EVENT, location_kind: 'off_campus', room: null, location: 'Kensico Dam' }} />);
+    expect(await screen.findByText(/Off campus · Kensico Dam/)).toBeTruthy();
+  });
+
+  it('asks for a major after the terms, and needs one picked', async () => {
+    const put = vi.fn(() => ({ major: 'nursing' }));
+    api({
+      '/auth/me': { ...ME, needs_major: true },
+      '/auth/majors': [{ key: 'nursing', label: 'Nursing' }],
+      '/auth/me/major': put,
+      '/events': [], '/rooms': [], '/alerts/unread': { unread: 0 },
+    });
+    renderPage(App);
+    expect(await screen.findByText("What's your major?")).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue' }).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+  });
+});
