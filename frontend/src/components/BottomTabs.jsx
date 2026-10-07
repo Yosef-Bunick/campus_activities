@@ -8,9 +8,11 @@ import CalendarIcon from '@mui/icons-material/esm/CalendarMonthOutlined';
 import MapIcon from '@mui/icons-material/esm/MapOutlined';
 import FavoritesIcon from '@mui/icons-material/esm/StarBorder';
 import AlertsIcon from '@mui/icons-material/esm/NotificationsNoneOutlined';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { apiGet } from '../api';
+import { preload, preloadTabsWhenIdle } from '../app/routes';
 
 export const TABS = [
   { path: '/home', label: 'Home', Icon: HomeIcon },
@@ -31,6 +33,13 @@ export default function BottomTabs() {
   });
   const unread = alerts?.unread ?? 0;
   const value = TABS.some((t) => t.path === location) ? location : false;
+  // Fetch the other tabs' code once the phone is idle, and any tab the moment a
+  // finger touches it, so switching tabs never waits on a download (ADR-033).
+  useEffect(() => preloadTabsWhenIdle(TABS.map((t) => t.path)), []);
+  const warm = (path) => {
+    preload(path);
+    if (path === '/map') new Image().src = '/maps/campus.webp';
+  };
   return (
     <Paper
       component="nav"
@@ -41,6 +50,7 @@ export default function BottomTabs() {
         {TABS.map(({ path, label, Icon }) => (
           <BottomNavigationAction
             key={path} value={path} label={label} sx={{ minWidth: 0 }}
+            onPointerDown={() => warm(path)} onMouseEnter={() => warm(path)}
             aria-label={path === '/alerts' && unread ? `${label}, ${unread} unread` : label}
             icon={path === '/alerts'
               ? <Badge color="error" badgeContent={unread} max={99}><Icon /></Badge>

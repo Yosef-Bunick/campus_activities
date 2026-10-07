@@ -9,6 +9,7 @@ import AccountIcon from '@mui/icons-material/esm/AccountCircleOutlined';
 import { useLocation } from 'wouter';
 import ApiStatus from './ApiStatus';
 import { useAuth } from '../contexts/AuthContext';
+import { APP_NAME } from '../brand';
 
 // Dialogs download only when opened.
 const DIALOGS = {
@@ -30,7 +31,7 @@ export default function TopBar({ showProfile }) {
     <AppBar position="sticky" elevation={0} sx={{ pt: 'env(safe-area-inset-top)' }}>
       <Toolbar variant="dense" sx={{ gap: 1.5 }}>
         <Typography variant="h6" component="span" sx={{ flexGrow: 1, fontSize: '1.1rem' }}>
-          Campus Events
+          {APP_NAME}
         </Typography>
         <ApiStatus />
         {showProfile && (

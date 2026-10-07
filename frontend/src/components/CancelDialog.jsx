@@ -13,6 +13,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPost } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { fmtDay } from '../lib/time';
+import { optimistic, sameEventOrSeries } from '../lib/optimistic';
 
 // One-off event: "Cancel event". Part of a series: only this date / this and
 // future / whole series (architecture §7). Past dates are never changed.
@@ -23,7 +24,8 @@ export default function CancelDialog({ event, open, onClose }) {
   const [reason, setReason] = useState('');
   const cancel = useMutation({
     mutationFn: () => apiPost(`/events/${event.id}/cancel`, { scope, reason }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['events'] }); onClose(); },
+    // Crossed out at once (ADR-033); the dialog closes without waiting.
+    ...optimistic(qc, (e) => sameEventOrSeries(event, scope)(e), (e) => ({ ...e, status: 'cancelled' })),
   });
   const someoneElses = user?.id !== event.creator?.id;
 
@@ -52,7 +54,7 @@ export default function CancelDialog({ event, open, onClose }) {
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Keep it</Button>
-        <Button color="error" variant="contained" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+        <Button color="error" variant="contained" disabled={cancel.isPending} onClick={() => { cancel.mutate(); onClose(); }}>
           Confirm
         </Button>
       </DialogActions>

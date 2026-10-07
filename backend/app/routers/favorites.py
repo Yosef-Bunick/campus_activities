@@ -116,8 +116,10 @@ def my_favorites(me: User = Depends(current_user), session: Session = Depends(ge
             .limit(200)
         )
     ) if fav_ids else []  # fmt: skip
+    # One events_out call for both lists shares its lookups (rooms, people, ...).
+    out = events_out(session, saved + from_people, me)
     return {
-        "saved": events_out(session, saved, me),
-        "from_people": events_out(session, from_people, me),
+        "saved": out[: len(saved)],
+        "from_people": out[len(saved) :],
         "people": [user_public(p) for p in sorted(people, key=lambda p: p.display_name.lower())],
     }

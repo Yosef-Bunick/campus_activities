@@ -107,6 +107,10 @@ In the Claude desktop app, `.claude/launch.json` has `api`, `web`, and `web-prod
 | backend | `ruff check .` · `python -m alembic check` · `python -m pytest -q` |
 | frontend | `npm run lint` · `npm test` · `npm run build && npm run size` (fails over 150 KB gzipped first-load JS) |
 
+### Changing the app name or icon
+
+Both live in `frontend/brand/` (details in [frontend/brand/README.md](frontend/brand/README.md)). **Name:** edit `brand.json`; the top bar, sign-in page, browser tab, iOS title and PWA manifest all read it. **Icon:** replace `brand/icon.png` (square, ideally 1024 px), then run `python scripts/make-icons.py` from `frontend/` to regenerate every icon size and the favicon.
+
 ## License
 
 [CC BY-NC-ND 4.0](LICENSE) © Yosef Bunick. Contact the creator for commercial use or modified versions.

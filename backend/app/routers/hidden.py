@@ -3,7 +3,7 @@ Hidden things drop out of every feed; /hidden lists them with Unhide."""
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlmodel import Session, col, select
+from sqlmodel import Session, col, func, select
 
 from app.core.auth import current_user
 from app.core.database import get_session
@@ -100,18 +100,31 @@ def my_hidden(me: User = Depends(current_user), session: Session = Depends(get_s
     ]
     people = list(session.exec(select(User).where(col(User.id).in_(ids)))) if ids else []
     rows = list(session.exec(select(HiddenEvent).where(HiddenEvent.user_id == me.id)))
+    # Two queries for all rows (not one per row): the hidden dates, and each
+    # hidden series' first date.
+    ev_ids = {r.event_id for r in rows if r.event_id}
+    by_id = {e.id: e for e in session.exec(select(Event).where(col(Event.id).in_(ev_ids)))} if ev_ids else {}
+    sids = {r.series_id for r in rows if r.series_id}
+    first = {}
+    if sids:
+        starts = (
+            select(Event.series_id, func.min(Event.starts_at).label("first"))
+            .where(col(Event.series_id).in_(sids))
+            .group_by(Event.series_id)
+            .subquery()
+        )
+        q = select(Event).join(
+            starts, (Event.series_id == starts.c.series_id) & (Event.starts_at == starts.c.first)
+        )
+        for ev in session.exec(q.order_by(Event.id)):
+            first.setdefault(ev.series_id, ev)
     events: list[tuple[str, Event]] = []
     for r in rows:
         if r.event_id:
-            ev = session.get(Event, r.event_id)
-            if ev:
-                events.append(("event", ev))
-        elif r.series_id:
-            ev = session.exec(
-                select(Event).where(Event.series_id == r.series_id).order_by(Event.starts_at)
-            ).first()
-            if ev:
-                events.append(("series", ev))
+            if r.event_id in by_id:
+                events.append(("event", by_id[r.event_id]))
+        elif r.series_id in first:
+            events.append(("series", first[r.series_id]))
     events.sort(key=lambda kv: kv[1].starts_at)
     out = events_out(session, [ev for _, ev in events], me)
     for item, (kind, _) in zip(out, events, strict=True):

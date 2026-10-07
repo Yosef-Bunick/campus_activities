@@ -33,12 +33,16 @@ def _rule_errors(fn):
         raise HTTPException(e.status, e.message) from None
 
 
-def rooms_out(session: Session) -> dict[int, dict]:
-    rows = session.exec(
+def rooms_out(session: Session, ids: set[int] | None = None) -> dict[int, dict]:
+    """Rooms with their floor and building; only `ids` if given."""
+    q = (
         select(Room, Floor, Building)
         .join(Floor, Floor.id == Room.floor_id, isouter=True)
         .join(Building, Building.id == Floor.building_id, isouter=True)
-    ).all()
+    )
+    if ids is not None:
+        q = q.where(col(Room.id).in_(ids))
+    rows = session.exec(q).all()
     return {
         r.id: {
             "id": r.id,
@@ -60,22 +64,26 @@ def _saved_by(session: Session, viewer: User | None) -> tuple[set[int], set[int]
 
     if viewer is None:
         return set(), set()
-    rows = list(session.exec(select(SavedEvent).where(SavedEvent.user_id == viewer.id)))
-    return {r.event_id for r in rows if r.event_id}, {r.series_id for r in rows if r.series_id}
+    rows = session.exec(
+        select(SavedEvent.event_id, SavedEvent.series_id).where(SavedEvent.user_id == viewer.id)
+    ).all()
+    return {e for e, _ in rows if e}, {s for _, s in rows if s}
 
 
 def events_out(session: Session, events: list[Event], viewer: User | None = None) -> list[dict]:
-    rooms = rooms_out(session)
+    # A fixed number of queries per call (no N+1), each limited to what these
+    # events refer to, so a long feed costs the same round trips as a short one.
+    if not events:
+        return []
+    room_ids = {e.room_id for e in events if e.room_id}
+    rooms = rooms_out(session, room_ids) if room_ids else {}
     saved_events, saved_series = _saved_by(session, viewer)
     sids = {e.series_id for e in events if e.series_id}
-    series_end = (
-        {s.id: s.ends_on for s in session.exec(select(EventSeries).where(col(EventSeries.id).in_(sids)))}
-        if sids else {}
-    )  # fmt: skip
+    series_end = dict(
+        session.exec(select(EventSeries.id, EventSeries.ends_on).where(col(EventSeries.id).in_(sids))).all()
+    ) if sids else {}  # fmt: skip
     ids = {e.creator_id for e in events}
-    people = (
-        {u.id: u for u in session.exec(select(User).where(col(User.id).in_(ids)))} if ids else {}
-    )
+    names = dict(session.exec(select(User.id, User.display_name).where(col(User.id).in_(ids))).all())
     return [
         {
             "id": e.id,
@@ -91,8 +99,8 @@ def events_out(session: Session, events: list[Event], viewer: User | None = None
             "room": rooms.get(e.room_id) if e.room_id else None,
             "location": e.location,
             "online_url": e.online_url,
-            "creator": {"id": e.creator_id, "display_name": people[e.creator_id].display_name}
-            if e.creator_id in people
+            "creator": {"id": e.creator_id, "display_name": names[e.creator_id]}
+            if e.creator_id in names
             else None,
             "cancelled_reason": e.cancelled_reason,
             "majors": [m for m in e.majors.split(",") if m],
@@ -227,7 +235,7 @@ def set_room_limit(
     M.log(session, user, "room_limit",
           f"Room {room.name}: overlap limit {body.max_overlapping or 'default'}")  # fmt: skip
     session.commit()
-    return rooms_out(session)[room.id]
+    return rooms_out(session, {room.id})[room.id]
 
 
 @router.post("/events/{event_id}/cancel")

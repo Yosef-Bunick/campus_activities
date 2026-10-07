@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearch } from 'wouter';
 import { API_BASE, apiGet, apiPost } from '../api';
+import { APP_NAME } from '../brand';
 
 const ROLES = ['student', 'security', 'student_gov', 'manager', 'owner'];
 
@@ -36,7 +37,7 @@ export default function SignInView() {
 
   return (
     <Box sx={{ p: 3, pt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, textAlign: 'center' }}>
-      <Typography variant="h4" component="h1">Campus Events</Typography>
+      <Typography variant="h4" component="h1">{APP_NAME}</Typography>
       <Typography color="text.secondary">What's happening on campus right now.</Typography>
       <Button
         variant="contained" size="large" fullWidth sx={{ maxWidth: 320 }}

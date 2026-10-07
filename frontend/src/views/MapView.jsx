@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -32,36 +32,39 @@ export default function MapView() {
   const { filter, active } = useFilter();
   const { can } = useAuth();
   const [when, setWhen] = useState('today'); // 'now' | 'today'
-  const [zoom, setZoom] = useState(1); // 1 = fill width; set to the "fit screen" scale once measured
-  const [fit, setFit] = useState(1); // scale that shows the whole map, no cropping
+  const [zoom, setZoom] = useState(1); // 1 = whole map fits the screen; up to MAX_ZOOM
   const [room, setRoom] = useState(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const pinch = useRef(null);
   const viewportRef = useRef(null);
-  const userZoomed = useRef(false);
+  const anchor = useRef(null); // map point under the screen centre, kept there while zooming
   const { data: rooms = [] } = useRooms();
 
-  const clampZoom = (z) => Math.min(MAX_ZOOM, Math.max(fit, z));
-
-  // Fit the whole map to the screen: scale so neither width nor height overflows,
-  // so the map is never cropped/zoomed-in on load or when the window resizes.
-  useEffect(() => {
+  // Never below "fits the screen" (1), never past MAX_ZOOM.
+  const zoomTo = (z) => {
     const el = viewportRef.current;
-    if (!el) return;
-    const measure = () => {
-      const { width: w, height: h } = el.getBoundingClientRect();
-      if (!w || !h) return;
-      // Map height = width × MAP_RATIO, so it fits when zoom × w × MAP_RATIO ≤ h.
-      const f = Math.min(1, h / (w * MAP_RATIO));
-      setFit(f);
-      if (!userZoomed.current) setZoom(f);
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    const next = z < 1.01 ? 1 : Math.min(MAX_ZOOM, z); // snap float drift back to "fit"
+    if (!el || next === zoom) return;
+    const box = el.firstElementChild;
+    if (box.offsetWidth) {
+      anchor.current = {
+        x: (el.scrollLeft + el.clientWidth / 2 - box.offsetLeft) / box.offsetWidth,
+        y: (el.scrollTop + el.clientHeight / 2 - box.offsetTop) / box.offsetHeight,
+      };
+    }
+    setZoom(next);
+  };
+
+  // After a zoom, scroll so the same spot stays in the middle of the screen.
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    const a = anchor.current;
+    if (!el || !a) return;
+    const box = el.firstElementChild;
+    el.scrollLeft = box.offsetLeft + a.x * box.offsetWidth - el.clientWidth / 2;
+    el.scrollTop = box.offsetTop + a.y * box.offsetHeight - el.clientHeight / 2;
+    anchor.current = null;
+  }, [zoom]);
 
   const params = useMemo(() => {
     const p = toApiParams(filter);
@@ -90,8 +93,7 @@ export default function MapView() {
   const onTouchStart = (e) => { if (e.touches.length === 2) pinch.current = { d: dist(e.touches), z: zoom }; };
   const onTouchMove = (e) => {
     if (e.touches.length === 2 && pinch.current) {
-      userZoomed.current = true;
-      setZoom(clampZoom(pinch.current.z * (dist(e.touches) / pinch.current.d)));
+      zoomTo(pinch.current.z * (dist(e.touches) / pinch.current.d));
     }
   };
   const onTouchEnd = () => { pinch.current = null; };
@@ -122,9 +124,19 @@ export default function MapView() {
           ref={viewportRef}
           data-testid="map-viewport"
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-          sx={{ position: 'absolute', inset: 0, overflow: 'auto', touchAction: 'pan-x pan-y', bgcolor: '#cfe3b4', display: 'flex' }}
+          sx={{
+            position: 'absolute', inset: 0, display: 'flex', touchAction: 'pan-x pan-y', bgcolor: (t) => (t.palette.mode === 'dark' ? '#1d2619' : '#cfe3b4') /* map's grass colour, dimmed in dark mode */,
+            // Size container: the map's fitted width comes from CSS (cqw/cqh), so it
+            // re-fits on every resize/rotation with no JS measuring. No scrollbars at fit.
+            containerType: 'size', overflow: zoom > 1 ? 'auto' : 'hidden',
+          }}
         >
-          <Box sx={{ position: 'relative', flexShrink: 0, margin: 'auto', width: `${zoom * 100}%`, aspectRatio: `1 / ${MAP_RATIO}` }}>
+          {/* Fitted width = min(container width, container height / MAP_RATIO), times zoom;
+              margin auto centres it while it's smaller than the screen. */}
+          <Box sx={{
+            position: 'relative', flexShrink: 0, margin: 'auto', aspectRatio: `1 / ${MAP_RATIO}`,
+            width: `calc(${zoom} * min(100cqw, ${100 / MAP_RATIO}cqh))`,
+          }}>
             <Box component="img" src={MAP_SRC} alt="Campus map" draggable={false}
               sx={{ width: '100%', height: '100%', display: 'block', userSelect: 'none' }} />
             {pinned.map((r) => {
@@ -148,8 +160,8 @@ export default function MapView() {
           </Box>
         </Box>
         <Paper sx={{ position: 'absolute', right: 12, bottom: 12, display: 'flex', flexDirection: 'column' }}>
-          <IconButton aria-label="Zoom in" onClick={() => { userZoomed.current = true; setZoom((z) => clampZoom(z * 1.4)); }}><AddIcon /></IconButton>
-          <IconButton aria-label="Zoom out" onClick={() => { userZoomed.current = true; setZoom((z) => clampZoom(z / 1.4)); }}><RemoveIcon /></IconButton>
+          <IconButton aria-label="Zoom in" onClick={() => zoomTo(zoom * 1.4)}><AddIcon /></IconButton>
+          <IconButton aria-label="Zoom out" onClick={() => zoomTo(zoom / 1.4)}><RemoveIcon /></IconButton>
         </Paper>
       </Box>
 

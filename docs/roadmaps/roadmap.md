@@ -110,6 +110,15 @@ Status legend: ⬜ not started · 🟨 in progress · ✅ done
 
 ---
 
+# Speed & polish (2026-10-07)
+- [x] Instant taps (save, hide, cancel), skeleton loaders, tab prefetch (ADR-033)
+- [x] Dark mode following the phone/laptop setting
+- [x] "Install the app" hint for iPhone and Android/desktop
+- [x] Map opens fully zoomed out and fits any screen, live on resize/rotation
+- [x] App name + icon swappable in one place (`frontend/brand/`)
+- [x] API: gzip responses, constant query counts on list endpoints
+- [ ] iPhone splash screens (once the final icon/name are chosen)
+
 # Later (not scheduled)
 - Follow a **club** (not just a person) once clubs exist as entities
 - Calendar **subscription feed** (webcal) of your saved events, so new ones appear automatically

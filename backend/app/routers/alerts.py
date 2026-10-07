@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, select
 
 from app.core.auth import current_user
 from app.core.database import get_session
@@ -19,16 +19,20 @@ def _unread(session: Session, me: User) -> int:
     ).one()
 
 
-def _event_status(session: Session, event_id: int | None) -> str | None:
-    ev = session.get(Event, event_id) if event_id else None
-    return ev.status if ev else None
+def _event_statuses(session: Session, alerts: list[Alert]) -> dict[int, str]:
+    """Status of every event these alerts point at, in one query (not one per alert)."""
+    ids = {a.event_id for a in alerts if a.event_id}
+    if not ids:
+        return {}
+    return dict(session.exec(select(Event.id, Event.status).where(col(Event.id).in_(ids))).all())
 
 
 @router.get("")
 def list_alerts(me: User = Depends(current_user), session: Session = Depends(get_session)) -> dict:
-    rows = session.exec(
+    rows = list(session.exec(
         select(Alert).where(Alert.user_id == me.id).order_by(Alert.created_at.desc()).limit(100)
-    )
+    ))  # fmt: skip
+    status = _event_statuses(session, rows)
     return {
         "unread": _unread(session, me),
         "alerts": [
@@ -37,7 +41,7 @@ def list_alerts(me: User = Depends(current_user), session: Session = Depends(get
                 "kind": a.kind,
                 "event_id": a.event_id,
                 # Lets the page hide Approve/Reject once someone has decided.
-                "event_status": _event_status(session, a.event_id),
+                "event_status": status.get(a.event_id),
                 "subject_user_id": a.subject_user_id,
                 "message": a.message,
                 "read": a.read_at is not None,

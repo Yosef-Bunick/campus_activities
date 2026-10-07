@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
+import Skeleton from '@mui/material/Skeleton';
+import EventSkeleton from './components/EventSkeleton';
 import { Redirect, Route, Switch, useLocation } from 'wouter';
 import { ROUTES } from './app/routes';
 import TopBar from './components/TopBar';
@@ -10,11 +11,14 @@ import { FilterProvider } from './contexts/FilterContext';
 
 const TermsDialog = lazy(() => import('./components/TermsDialog'));
 const MajorDialog = lazy(() => import('./components/MajorDialog'));
+const InstallHint = lazy(() => import('./components/InstallHint'));
 
+// While a page's code downloads: its title area + skeleton cards, not a spinner.
 function Loading() {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-      <CircularProgress size={28} aria-label="Loading page" />
+    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }} aria-label="Loading page">
+      <Skeleton variant="text" width={160} height={36} />
+      <EventSkeleton />
     </Box>
   );
 }
@@ -38,6 +42,8 @@ export default function App() {
           pb: signedInArea ? `calc(${TAB_BAR_HEIGHT}px + env(safe-area-inset-bottom))` : 0,
         }}
       >
+        {/* "Install the app" (iPhone: Share → Add to Home Screen; Android/desktop: Install). */}
+        {signedInArea && <Suspense fallback={null}><InstallHint /></Suspense>}
         {/* One <Suspense> for every lazy page, as in unified. */}
         <Suspense fallback={<Loading />}>
           <Switch>

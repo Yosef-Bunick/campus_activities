@@ -1,13 +1,13 @@
 import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import { fmtDay, groupByDay } from '../lib/time';
 import EventCard from './EventCard';
+import EventSkeleton from './EventSkeleton';
 
 // Events grouped by New York day (or one flat list).
 export default function EventList({ query, empty, grouped = true }) {
   const { data, isPending, error } = query;
-  if (isPending) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress size={24} /></Box>;
+  if (isPending) return <EventSkeleton />;
   if (error) return <Typography color="error" sx={{ p: 2 }}>{error.message}</Typography>;
   if (!data.length) return <Typography color="text.secondary" sx={{ py: 2 }}>{empty}</Typography>;
   const groups = grouped ? groupByDay(data) : [[null, data]];

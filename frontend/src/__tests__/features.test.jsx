@@ -67,6 +67,20 @@ describe('map', () => {
     fireEvent.click(pin);
     expect(await screen.findByText('Study, group')).toBeTruthy();
   });
+
+  it('opens fitted to the screen and never zooms out past that', () => {
+    api({ '/auth/me': { user: { id: 1 }, permissions: [], limits: {}, csrf_token: 't' }, '/rooms': [], '/events': [] });
+    renderPage(MapView);
+    const viewport = screen.getByTestId('map-viewport');
+    const overflow = () => getComputedStyle(viewport).overflow;
+    expect(overflow()).toBe('hidden'); // fitted: nothing to scroll
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(overflow()).toBe('hidden');
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(overflow()).toBe('auto'); // zoomed: scroll around the map
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(overflow()).toBe('hidden');
+  });
 });
 
 describe('favorites', () => {

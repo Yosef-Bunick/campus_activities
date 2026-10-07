@@ -1,6 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { readFileSync } from 'node:fs'
+
+// App name, colours and icon live in brand/ (see brand/README.md).
+const brand = JSON.parse(readFileSync(new URL('./brand/brand.json', import.meta.url), 'utf8'))
+const escapeHtml = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
 
 // The API's origin, baked into the service worker so it can keep an offline
 // copy of the last answers (ADR-031). Same default as src/api.js.
@@ -11,6 +16,8 @@ const API_READS = new RegExp(`^${escapeRe(API_BASE)}/(events|rooms|favorites|hid
 export default defineConfig({
   plugins: [
     react(),
+    // index.html says %APP_NAME% for <title> and the iOS home-screen title.
+    { name: 'brand-name', transformIndexHtml: (html) => html.replaceAll('%APP_NAME%', escapeHtml(brand.name)) },
     // PWA: manifest + Workbox service worker, so the app can be added to the
     // home screen. Off in `npm run dev` (a dev SW caches stale code); check it
     // with `npm run build && npm run preview`.
@@ -19,15 +26,15 @@ export default defineConfig({
       injectRegister: 'script-defer',
       includeManifestIcons: false, // already matched by globPatterns below
       manifest: {
-        name: 'Campus Events',
-        short_name: 'Campus Events',
-        description: "What's happening on campus right now",
+        name: brand.name,
+        short_name: brand.shortName,
+        description: brand.description,
         start_url: '/home',
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#ffffff',
-        theme_color: '#1976d2',
+        background_color: brand.backgroundColor,
+        theme_color: brand.themeColor,
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

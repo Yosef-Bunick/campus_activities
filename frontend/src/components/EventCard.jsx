@@ -15,6 +15,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPost } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { downloadIcs, googleCalendarUrl } from '../lib/calendarLinks';
+import { optimistic, sameEventOrSeries } from '../lib/optimistic';
 import { fmtTime } from '../lib/time';
 import { TYPE_LABEL, placeLabel, safeUrl } from '../lib/labels';
 
@@ -43,9 +44,10 @@ export default function EventCard({ event, showDate = false }) {
     qc.invalidateQueries({ queryKey: ['favorites'] });
     qc.invalidateQueries({ queryKey: ['hidden'] });
   };
+  // Instant taps (ADR-033): the list changes now; the server catches up.
   const hide = useMutation({
     mutationFn: (scope) => apiPost(`/events/${event.id}/hide`, { scope }),
-    onSuccess: refresh,
+    ...optimistic(qc, (e, scope) => sameEventOrSeries(event, scope === 'series' ? 'series' : 'this')(e), () => null),
   });
   const report = useMutation({
     mutationFn: (reason) => apiPost(`/events/${event.id}/report`, { reason }),
@@ -76,7 +78,13 @@ export default function EventCard({ event, showDate = false }) {
   };
   const save = useMutation({
     mutationFn: (scope) => (scope ? apiPost(`/events/${event.id}/save`, { scope }) : apiPost(`/events/${event.id}/unsave`)),
-    onSuccess: refresh,
+    ...optimistic(
+      qc,
+      // Unsaving clears the date and its series on the server, so clear both here.
+      (e, scope) => (scope ? sameEventOrSeries(event, scope)(e) : sameEventOrSeries(event, 'series')(e) || e.id === event.id),
+      (e, scope) => ({ ...e, saved: scope ? (scope === 'series' ? 'series' : 'event') : null }),
+      (e, scope) => (scope ? { ...e, saved: scope === 'series' ? 'series' : 'event' } : null), // leaves Saved at once
+    ),
   });
   const onStar = (e) => {
     if (event.saved) save.mutate(null);

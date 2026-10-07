@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.core.config import settings
 from app.core.csrf import CSRFMiddleware
@@ -40,6 +41,11 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Campus Events API", version="0.1.0", lifespan=lifespan)
+
+# Innermost: compresses route responses only (a month of events is ~100 KB of
+# JSON, ~10x smaller gzipped); CSRF and CORS wrap it unchanged. Small bodies
+# aren't worth it.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Added before CORS so CORS is the outer layer: CSRF 403s still carry CORS headers.
 app.add_middleware(CSRFMiddleware)
